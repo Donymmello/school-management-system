@@ -11,8 +11,8 @@ const Student = sequelize.define(
     },
 
     studentCode: {
-      type: DataTypes.STRING,
-      allowNull: true,
+      type: DataTypes.STRING(50),
+      allowNull: false,
       unique: true,
       field: "student_code",
     },
@@ -35,10 +35,10 @@ const Student = sequelize.define(
       field: "name",
     },
 
-    age: {
+    birthday: {
       type: DataTypes.DATEONLY,
       allowNull: true,
-      field: "age",
+      field: "birthday",
     },
 
     grade: {
@@ -54,18 +54,18 @@ const Student = sequelize.define(
     },
 
     telephone: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(50),
       allowNull: true,
     },
 
     idCard: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(50),
       allowNull: true,
       field: "id_card",
     },
     
     idNumber: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(100),
       allowNull: true,
       field: "id_number",
     },

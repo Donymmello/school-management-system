@@ -28,6 +28,13 @@ const User = sequelize.define(
       },
     },
 
+    employeeCode: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      unique: true,
+      field: "employee_code",
+    },
+
     passwordHash: {
       type: DataTypes.STRING(255),
       allowNull: false,
@@ -35,7 +42,14 @@ const User = sequelize.define(
     },
 
     role: {
-      type: DataTypes.ENUM("SUPER_ADMIN", "ADMIN", "TEACHER", "DIRECTOR", "STUDENT", "USER"),
+      type: DataTypes.ENUM(
+        "SUPER_ADMIN",
+        "ADMIN",
+        "TEACHER",
+        "DIRECTOR",
+        "SECRETARY",
+        "STUDENT",
+        "USER"),
       allowNull: false,
       defaultValue: "USER",
     },

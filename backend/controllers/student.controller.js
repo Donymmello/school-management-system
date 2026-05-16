@@ -1,90 +1,6 @@
 const { Student, User } = require("../models");
-const generateStudentCode = require("../utils/generateStudentCod");
-
-// Criar estudante internamente: ADMIN / DIRETOR
-async function createStudent(req, res) {
-  try {
-    const {
-      name,
-      age,
-      grade,
-      email,
-      telephone,
-      idCard,
-      idNumber,
-      notes,
-      userId,
-    } = req.body;
-
-    if (!name || !email) {
-      return res.status(400).json({
-        message: "Name and email are required.",
-      });
-    }
-
-    // Verifica se já existe estudante com o mesmo email
-    const existingStudentByEmail = await Student.findOne({
-      where: { email },
-    });
-
-    if (existingStudentByEmail) {
-      return res.status(409).json({
-        message: "A student with this email already exists.",
-      });
-    }
-
-    // Verifica BI, se for enviado
-    if (idNumber) {
-      const existingStudentByIdNumber = await Student.findOne({
-        where: { idNumber },
-      });
-
-      if (existingStudentByIdNumber) {
-        return res.status(409).json({
-          message: "A student with this ID number already exists.",
-        });
-      }
-    }
-
-    // Se vier userId, confirma se o User existe
-    if (userId) {
-      const user = await User.findByPk(userId);
-
-      if (!user) {
-        return res.status(404).json({
-          message: "User linked to this student was not found.",
-        });
-      }
-    }
-
-    const studentCode = generateStudentCod();
-
-    const student = await Student.create({
-      studentCode,
-      name,
-      age: age || null,
-      grade: grade || null,
-      email,
-      telephone: telephone || null,
-      idCard: idCard || null,
-      idNumber: idNumber || null,
-      notes: notes || [],
-      userId: userId || null,
-    });
-
-    return res.status(201).json({
-      message: "Student created successfully.",
-      student,
-    });
-  } catch (error) {
-    console.error("Error creating student:", error);
-
-    return res.status(500).json({
-      message: "An error occurred while creating the student.",
-      error: error.message,
-    });
-  }
-}
+const generateStudentCode = require("../utils/generateStudentCode");
+const registerLogAudit = require("../utils/logAudit");
 
 // Listar todos os estudantes
 async function getAllStudents(req, res) {
@@ -140,6 +56,7 @@ async function updateStudent(req, res) {
       email,
       telephone,
       idCard,
+      idNumber,
       notes,
       userId,
     } = req.body;
@@ -169,6 +86,7 @@ async function updateStudent(req, res) {
       email: email ?? student.email,
       telephone: telephone ?? student.telephone,
       idCard: idCard ?? student.idCard,
+      idNumber: idNumber ?? student.idNumber,
       notes: notes ?? student.notes,
       userId: userId ?? student.userId,
     });
@@ -216,7 +134,6 @@ async function deleteStudent(req, res) {
 }
 
 module.exports = {
-  createStudent,
   getAllStudents,
   getStudentById,
   updateStudent,

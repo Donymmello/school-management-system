@@ -7,42 +7,34 @@ const authorizeRoles = require("../middleware/role.middleware");
 
 
 const {
-  createStudent,
   getAllStudents,
   getStudentById,
   updateStudent,
   deleteStudent,
 } = require('../controllers/student.controller');
 
-router.post(
-  '/',
-  authMiddleware,
-  authorizeRoles("ADMIN", "DIRETOR"),
-   createStudent
-  );
-
 router.get(
   '/', 
   authMiddleware,
-  authorizeRoles("ADMIN", "DIRETOR"),
+  authorizeRoles("ADMIN", "DIRECTOR"),
   getAllStudents
 );
 router.get(
   '/:id', 
   authMiddleware,
-  authorizeRoles("ADMIN", "DIRETOR"),
+  authorizeRoles("ADMIN", "DIRECTOR"),
   getStudentById
 );
 router.patch(
   '/:id', 
   authMiddleware,
-  authorizeRoles("ADMIN", "DIRETOR"),
+  authorizeRoles("ADMIN", "DIRECTOR"),
   updateStudent
 );
 router.delete(
   '/:id', 
   authMiddleware,
-  authorizeRoles("ADMIN", "DIRETOR"),
+  authorizeRoles("ADMIN", "DIRECTOR"),
   deleteStudent
 );
 

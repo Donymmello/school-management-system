@@ -4,7 +4,7 @@ const router = express.Router();
 // Importa as funções do controller de autenticação
 const {
   bootstrapAdmin,
-  registerStaff,
+  registerUser,
   registerStudent,
   login,
   getMe,
@@ -21,7 +21,7 @@ router.post("/bootstrap-admin", bootstrapAdmin);
 router.post("/register-student", registerStudent);
 
 // Registo interno de utilizadores administrativos
-router.post("/register-staff", authMiddleware, registerStaff);
+router.post("/register-user", authMiddleware, registerUser);
 
 // Fazer login
 router.post("/login", login);
