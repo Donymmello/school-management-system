@@ -20,7 +20,7 @@ const {
 router.get(
   "/",
   authMiddleware,
-  authorizeRoles("ADMIN", "GESTOR"),
+  authorizeRoles("ADMIN", "SUPER_ADMIN"),
   getAllLogsAudit
 );
 
@@ -35,7 +35,7 @@ router.get(
 router.get(
   "/:id",
   authMiddleware,
-  authorizeRoles("ADMIN", "GESTOR"),
+  authorizeRoles("ADMIN", "SUPER_ADMIN"),
   getLogAuditById
 );
 

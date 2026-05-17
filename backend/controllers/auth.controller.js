@@ -1,6 +1,6 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { User, Student, Teacher } = require("../models");
+const { User, Student, Teacher, Staff } = require("../models");
 const generateStudentCode = require("../utils/generateStudentCode");
 const generateEmployeeCode = require("../utils/generateEmployeeCode");
 const registerLogAudit = require("../utils/logAudit");
@@ -200,6 +200,8 @@ const registerUser = async (req, res) => {
       telephone,
       idCard,
       idNumber,
+      position,
+      department,
 
       subject,
     } = req.body;
@@ -220,6 +222,7 @@ const registerUser = async (req, res) => {
       "ADMIN",
       "DIRECTOR",
       "SECRETARY",
+      "STAFF",
       "TEACHER",
       "STUDENT",
     ];
@@ -279,6 +282,7 @@ const registerUser = async (req, res) => {
 
     let student = null;
     let teacher = null;
+    let staff = null;
 
     if (role === "STUDENT") {
       const studentCode = await generateStudentCode();
@@ -306,6 +310,17 @@ const registerUser = async (req, res) => {
       });
     }
 
+    if (role === "STAFF") {
+  staff = await Staff.create({
+    userId: user.id,
+    employeeCode,
+    name,
+    email,
+    position: position || "Staff",
+    department: department || null,
+  });
+}
+
     await registerLogAudit({
       userId: req.user.id,
       action: "REGISTER_USER",
@@ -326,6 +341,7 @@ const registerUser = async (req, res) => {
       },
       student,
       teacher,
+      staff,
     });
   } catch (error) {
     console.error("Error registering user:", error);
