@@ -5,6 +5,8 @@ const Student = require("./student");
 const Teacher = require("./teacher");
 const Staff = require("./staff");
 const Attendance = require("./attendance");
+const Course = require("./course");
+const CourseOffering = require("./courseOffering");
 const Grade = require("./grade");
 const Subject = require("./subject");
 const Classroom = require("./classroom");
@@ -77,9 +79,20 @@ Grade.belongsTo(Student, {
   as: "student",
 });
 
+// Student N - 1 Course
+Student.belongsTo(Course, {
+  foreignKey: "courseId",
+  as: "course",
+});
+
+Course.hasMany(Student, {
+  foreignKey: "courseId",
+  as: "students",
+});
+
 /*
   ================================
-  TEACHER / SUBJECT / GRADE
+  TEACHER / SUBJECT / GRADE / COURSE
   ================================
 */
 
@@ -104,6 +117,28 @@ Grade.belongsTo(Subject, {
   foreignKey: "subjectId",
   as: "subject",
 });
+
+// Subject 1 - N Course
+Subject.hasMany(Course, {
+  foreignKey: "subjectId",
+  as: "courses",
+});
+
+Course.belongsTo(Subject, {
+  foreignKey: "subjectId",
+  as: "subject",
+});
+
+Course.hasMany(CourseOffering, {
+  foreignKey: "courseId",
+  as: "offerings",
+});
+
+CourseOffering.belongsTo(Course, {
+  foreignKey: "courseId",
+  as: "course",
+});
+
 
 /*
   ================================
@@ -149,4 +184,6 @@ module.exports = {
   Subject,
   Classroom,
   LogAudit,
+  Course,
+  CourseOffering,
 };
