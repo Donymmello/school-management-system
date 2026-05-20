@@ -4,18 +4,25 @@ const User = require("./user");
 const Student = require("./student");
 const Teacher = require("./teacher");
 const Staff = require("./staff");
+
 const Attendance = require("./attendance");
+const Grade = require("./grade");
+
+const Subject = require("./subject");
+
 const Course = require("./course");
 const CourseOffering = require("./courseOffering");
-const Grade = require("./grade");
-const Subject = require("./subject");
+
+const Enrollment = require("./enrollment");
+
 const Classroom = require("./classroom");
+
 const LogAudit = require("./logAudit");
 
 /*
-  ================================
+  ======================================================
   USER RELATIONS
-  ================================
+  ======================================================
 */
 
 // User 1 - 1 Student
@@ -52,9 +59,26 @@ Staff.belongsTo(User, {
 });
 
 /*
-  ================================
+  ======================================================
+  USER ↔ ENROLLMENT APPROVALS
+  ======================================================
+*/
+
+// User 1 - N Approved Enrollments
+User.hasMany(Enrollment, {
+  foreignKey: "approvedBy",
+  as: "approvedEnrollments",
+});
+
+Enrollment.belongsTo(User, {
+  foreignKey: "approvedBy",
+  as: "approver",
+});
+
+/*
+  ======================================================
   STUDENT RELATIONS
-  ================================
+  ======================================================
 */
 
 // Student 1 - N Attendance
@@ -91,9 +115,9 @@ Course.hasMany(Student, {
 });
 
 /*
-  ================================
-  TEACHER / SUBJECT / GRADE / COURSE
-  ================================
+  ======================================================
+  TEACHER RELATIONS
+  ======================================================
 */
 
 // Teacher 1 - N Grade
@@ -107,6 +131,12 @@ Grade.belongsTo(Teacher, {
   as: "teacher",
 });
 
+/*
+  ======================================================
+  SUBJECT RELATIONS
+  ======================================================
+*/
+
 // Subject 1 - N Grade
 Subject.hasMany(Grade, {
   foreignKey: "subjectId",
@@ -118,17 +148,30 @@ Grade.belongsTo(Subject, {
   as: "subject",
 });
 
-// Subject 1 - N Course
-Subject.hasMany(Course, {
-  foreignKey: "subjectId",
-  as: "courses",
+/*
+  ======================================================
+  COURSE ↔ SUBJECT
+  ======================================================
+*/
+
+// Course 1 - N Subject
+Course.hasMany(Subject, {
+  foreignKey: "courseId",
+  as: "subjects",
 });
 
-Course.belongsTo(Subject, {
-  foreignKey: "subjectId",
-  as: "subject",
+Subject.belongsTo(Course, {
+  foreignKey: "courseId",
+  as: "course",
 });
 
+/*
+  ======================================================
+  COURSE ↔ COURSE OFFERING
+  ======================================================
+*/
+
+// Course 1 - N CourseOffering
 Course.hasMany(CourseOffering, {
   foreignKey: "courseId",
   as: "offerings",
@@ -139,11 +182,38 @@ CourseOffering.belongsTo(Course, {
   as: "course",
 });
 
+/*
+  ======================================================
+  ENROLLMENT RELATIONS
+  ======================================================
+*/
+
+// Student 1 - N Enrollment
+Student.hasMany(Enrollment, {
+  foreignKey: "studentId",
+  as: "enrollments",
+});
+
+Enrollment.belongsTo(Student, {
+  foreignKey: "studentId",
+  as: "student",
+});
+
+// CourseOffering 1 - N Enrollment
+CourseOffering.hasMany(Enrollment, {
+  foreignKey: "courseOfferingId",
+  as: "enrollments",
+});
+
+Enrollment.belongsTo(CourseOffering, {
+  foreignKey: "courseOfferingId",
+  as: "courseOffering",
+});
 
 /*
-  ================================
-  CLASSROOM
-  ================================
+  ======================================================
+  CLASSROOM RELATIONS
+  ======================================================
 */
 
 // Classroom 1 - N Student
@@ -158,11 +228,12 @@ Student.belongsTo(Classroom, {
 });
 
 /*
-  ================================
-  LOG AUDIT
-  ================================
+  ======================================================
+  LOG AUDIT RELATIONS
+  ======================================================
 */
 
+// User 1 - N Audit Logs
 User.hasMany(LogAudit, {
   foreignKey: "userId",
   as: "logs",
@@ -173,17 +244,31 @@ LogAudit.belongsTo(User, {
   as: "user",
 });
 
+/*
+  ======================================================
+  EXPORTS
+  ======================================================
+*/
+
 module.exports = {
   sequelize,
+
   User,
   Student,
   Teacher,
   Staff,
+
   Attendance,
   Grade,
+
   Subject,
-  Classroom,
-  LogAudit,
+
   Course,
   CourseOffering,
+
+  Enrollment,
+
+  Classroom,
+
+  LogAudit,
 };
