@@ -12,6 +12,7 @@ const Subject = require("./subject");
 
 const Course = require("./course");
 const CourseOffering = require("./courseOffering");
+const CourseOfferingSubject = require("./courseOfferingSubject");
 
 const Enrollment = require("./enrollment");
 
@@ -182,6 +183,46 @@ CourseOffering.belongsTo(Course, {
   as: "course",
 });
 
+CourseOffering.hasMany(CourseOfferingSubject, {
+  foreignKey: "courseOfferingId",
+  as: "subjects",
+});
+
+CourseOfferingSubject.belongsTo(CourseOffering, {
+  foreignKey: "courseOfferingId",
+  as: "courseOffering",
+});
+
+Subject.hasMany(CourseOfferingSubject, {
+  foreignKey: "subjectId",
+  as: "offerings",
+});
+
+CourseOfferingSubject.belongsTo(Subject, {
+  foreignKey: "subjectId",
+  as: "subject",
+});
+
+Teacher.hasMany(CourseOfferingSubject, {
+  foreignKey: "teacherId",
+  as: "assignedSubjects",
+});
+
+CourseOfferingSubject.belongsTo(Teacher, {
+  foreignKey: "teacherId",
+  as: "teacher",
+});
+
+Classroom.hasMany(CourseOfferingSubject, {
+  foreignKey: "classroomId",
+  as: "scheduledSubjects",
+});
+
+CourseOfferingSubject.belongsTo(Classroom, {
+  foreignKey: "classroomId",
+  as: "classroom",
+});
+
 /*
   ======================================================
   ENROLLMENT RELATIONS
@@ -265,6 +306,7 @@ module.exports = {
 
   Course,
   CourseOffering,
+  CourseOfferingSubject,
 
   Enrollment,
 
