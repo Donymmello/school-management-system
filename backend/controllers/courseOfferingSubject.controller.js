@@ -3,7 +3,6 @@ const {
     CourseOffering,
     Subject,
     Teacher,
-    Classroom
 } = require('../models');
 
 async function createCourseOfferingSubject(req, res) {
@@ -12,7 +11,6 @@ async function createCourseOfferingSubject(req, res) {
             courseOfferingId,
             subjectId,
             teacherId,
-            classroomId,
             weeklyHours,
             startDate,
             endDate,
@@ -51,7 +49,6 @@ async function createCourseOfferingSubject(req, res) {
             courseOfferingId,
             subjectId,
             teacherId,
-            classroomId,
             weeklyHours,
             startDate,
             endDate,
@@ -86,10 +83,7 @@ async function getAllCourseOfferingSubjects(req, res) {
                     model: Teacher,
                     as: "teacher",
                 },
-                {
-                    model: Classroom,
-                    as: "classroom",
-                },
+                
             ],
         });
 
@@ -119,10 +113,7 @@ async function getCourseOfferingSubjectById(req, res) {
                         model: Teacher,
                         as: "teacher",
                     },
-                    {
-                        model: Classroom,
-                        as: "classroom",
-                    },
+                    
                 ],
             }
         );

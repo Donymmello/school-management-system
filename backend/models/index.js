@@ -15,7 +15,7 @@ const CourseOffering = require("./courseOffering");
 const CourseOfferingSubject = require("./courseOfferingSubject");
 
 const Enrollment = require("./enrollment");
-
+const Schedule = require("./schedule");
 const Classroom = require("./classroom");
 
 const LogAudit = require("./logAudit");
@@ -223,6 +223,16 @@ CourseOfferingSubject.belongsTo(Classroom, {
   as: "classroom",
 });
 
+CourseOfferingSubject.hasMany(Schedule, {
+  foreignKey: "courseOfferingSubjectId",
+  as: "schedules",
+});
+
+Schedule.belongsTo(CourseOfferingSubject, {
+  foreignKey: "courseOfferingSubjectId",
+  as: "courseOfferingSubject",
+});
+
 /*
   ======================================================
   ENROLLMENT RELATIONS
@@ -268,6 +278,16 @@ Student.belongsTo(Classroom, {
   as: "classroom",
 });
 
+Classroom.hasMany(Schedule, {
+  foreignKey: "classroomId",
+  as: "schedules",
+});
+
+Schedule.belongsTo(Classroom, {
+  foreignKey: "classroomId",
+  as: "classroom",
+});
+
 /*
   ======================================================
   LOG AUDIT RELATIONS
@@ -307,7 +327,7 @@ module.exports = {
   Course,
   CourseOffering,
   CourseOfferingSubject,
-
+  Schedule,
   Enrollment,
 
   Classroom,

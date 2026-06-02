@@ -28,12 +28,6 @@ const CourseOfferingSubject = sequelize.define(
             field: "teacher_id"
         },
 
-        classroomId: {
-            type: DataTypes.INTEGER,
-            allowNull: true,
-            field: "classroom_id"
-        },
-
         weeklyHours: {
             type: DataTypes.INTEGER,
             allowNull: false,
