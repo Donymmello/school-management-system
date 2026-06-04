@@ -8,6 +8,7 @@ const {
     createCourseOfferingSubject,
     getAllCourseOfferingSubjects,
     getCourseOfferingSubjectById,
+    updateCourseOfferingSubject,
 } = require('../controllers/courseOfferingSubject.controller');
 
 router.post(
@@ -27,6 +28,13 @@ router.get(
     '/:id',
     authMiddleware,
     getCourseOfferingSubjectById
+);
+
+router.put(
+    '/:id',
+    authMiddleware,
+    authorizeRoles('ADMIN', 'SUPER_ADMIN', 'STAFF'),
+    updateCourseOfferingSubject
 );
 
 module.exports = router;

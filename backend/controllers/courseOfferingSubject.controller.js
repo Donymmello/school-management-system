@@ -132,8 +132,41 @@ async function getCourseOfferingSubjectById(req, res) {
     }
 }
 
+async function updateCourseOfferingSubject(req, res) {
+    try {
+        const { id } = req.params;
+        const { teacherId, weeklyHours, startDate, endDate, status } = req.body;
+
+        const item = await CourseOfferingSubject.findByPk(id);
+
+        if (!item) {
+            return res.status(404).json({
+                message: "Course offering subject not found",
+            });
+        }
+
+        await item.update({
+            teacherId,
+            weeklyHours,
+            startDate,
+            endDate,
+            status,
+        });
+
+        return res.status(200).json({
+            message: "Course offering subject updated successfully",
+            data: item,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: error.message,
+        });
+    }
+}
+
 module.exports = {
     createCourseOfferingSubject,
     getAllCourseOfferingSubjects,
     getCourseOfferingSubjectById,
+    updateCourseOfferingSubject,
 };

@@ -19,6 +19,7 @@ const courseOfferingSubjectRoutes = require('./routes/courseOfferingSubjects.rou
 const scheduleRoutes = require('./routes/schedules.routes');
 const studentAssessmentRoutes = require('./routes/studentAssessments.routes');
 const assessmentRoutes = require('./routes/assessments.routes');
+const resultRoutes = require('./routes/results.routes');
 ///const gradeRoutes = require('./routes/grades');
 //const attendanceRoutes = require('./routes/attendance');
 //const emailRoutes = require('./routes/emails');
@@ -41,6 +42,7 @@ app.use('/api/course-offering-subjects', courseOfferingSubjectRoutes);
 app.use('/api/schedules', scheduleRoutes);
 app.use('/api/assessments', assessmentRoutes);
 app.use('/api/student-assessments', studentAssessmentRoutes);
+app.use('/api/results', resultRoutes);
 ////app.use('/api/teachers', teacherRoutes);
 //app.use('/api/staff', staffRoutes);
 //app.use('/api/grades', gradeRoutes);

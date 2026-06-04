@@ -10,10 +10,10 @@ const Assessment = sequelize.define(
             autoIncrement: true,
         },
 
-        courseOfferingId: {
+        courseOfferingSubjectId: {
             type: DataTypes.INTEGER,
             allowNull: false,
-            field: "course_offering_id",        
+            field: "course_offering_subject_id",
         },
 
         title: {
@@ -24,6 +24,15 @@ const Assessment = sequelize.define(
         type: {
             type: DataTypes.ENUM("TEST", "ASSIGNMENT", "PROJECT", "EXAM"),
             allowNull: false,
+        },
+
+        category: {
+            type: DataTypes.ENUM(
+                "CONTINUOUS",
+                "EXAM"
+            ),
+            allowNull: false,
+            defaultValue: "CONTINUOUS",
         },
 
         maxScore: {

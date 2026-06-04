@@ -1,5 +1,5 @@
 const {
-    StudentAssessment,    Enrollment,
+    StudentAssessment,
     Assessment,
     Enrollment,
 } = require("../models");

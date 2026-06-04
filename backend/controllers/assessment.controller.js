@@ -5,7 +5,15 @@ const {
 
 async function createAssessment(req, res) {
     try {
-        const { courseOfferingSubjectId, title, type, maxScore, weight, assessmentDate, description } = req.body;
+        const {
+            courseOfferingSubjectId,
+            title,
+            type,
+            maxScore,
+            weight,
+            assessmentDate,
+            description
+        } = req.body;
 
         const subject =
             await CourseOfferingSubject.findByPk(
@@ -16,32 +24,32 @@ async function createAssessment(req, res) {
             return res.status(404).json({ message: "Course offering subject not found" });
         }
 
-        const totalWeight = 
+        const totalWeight =
             await Assessment.sum("weight", {
                 where: {
-                    courseOfferingId: subject.courseOfferingId,
+                    courseOfferingSubjectId,
                 },
             });
 
-            const finalWeight =
+        const finalWeight =
             (totalWeight || 0) + Number(weight);
 
         if (finalWeight > 100) {
             return res.status(400).json({
-                 message: "Assessment weight cannot exceed 100%",
-                 });
+                message: "Assessment weight cannot exceed 100%",
+            });
         }
 
         const assessment =
-         await Assessment.create({
-            courseOfferingId,
-            title,
-            type,
-            maxScore,
-            weight,
-            assessmentDate,
-            description,
-        });
+            await Assessment.create({
+                courseOfferingSubjectId,
+                title,
+                type,
+                maxScore,
+                weight,
+                assessmentDate,
+                description,
+            });
 
         return res.status(201).json({
             message: "Assessment created successfully",
@@ -59,14 +67,14 @@ async function createAssessment(req, res) {
 async function getAssessments(req, res) {
     try {
         const assessments =
-         await Assessment.findAll({
-            include: [
-                {
-                    association:
-                     "courseOfferingSubject",
-                },
-            ],
-        });
+            await Assessment.findAll({
+                include: [
+                    {
+                        association:
+                            "courseOfferingSubject",
+                    },
+                ],
+            });
 
         return res.status(200).json({
             assessments
