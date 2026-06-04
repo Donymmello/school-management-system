@@ -7,6 +7,8 @@ const Staff = require("./staff");
 
 const Attendance = require("./attendance");
 const Grade = require("./grade");
+const Assessment = require("./assessment");
+const StudentAssessment = require("./studentAssessment");
 
 const Subject = require("./subject");
 
@@ -290,6 +292,61 @@ Schedule.belongsTo(Classroom, {
 
 /*
   ======================================================
+  ASSESSMENT RELATIONS
+  ======================================================
+*/
+CourseOfferingSubject.hasMany(
+  Assessment,
+  {
+    foreignKey:
+      "courseOfferingSubjectId",
+    as: "assessments",
+  }
+);
+
+Assessment.belongsTo(
+  CourseOfferingSubject,
+  {
+    foreignKey:
+      "courseOfferingSubjectId",
+    as: "courseOfferingSubject",
+  }
+);
+
+Assessment.hasMany(
+  StudentAssessment,
+  {
+    foreignKey: "assessmentId",
+    as: "results",
+  }
+);
+
+StudentAssessment.belongsTo(
+  Assessment,
+  {
+    foreignKey: "assessmentId",
+    as: "assessment",
+  }
+);
+
+Enrollment.hasMany(
+  StudentAssessment,
+  {
+    foreignKey: "enrollmentId",
+    as: "assessments",
+  }
+);
+
+StudentAssessment.belongsTo(
+  Enrollment,
+  {
+    foreignKey: "enrollmentId",
+    as: "enrollment",
+  }
+);
+
+/*
+  ======================================================
   LOG AUDIT RELATIONS
   ======================================================
 */
@@ -323,6 +380,8 @@ module.exports = {
   Grade,
 
   Subject,
+  Assessment,
+  StudentAssessment,
 
   Course,
   CourseOffering,
