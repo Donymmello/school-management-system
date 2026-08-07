@@ -8,6 +8,8 @@ const {
   registerStudent,
   login,
   getMe,
+  forgotPassword,
+  resetPassword,
 } = require("../controllers/auth.controller");
 
 // Importa o middleware de autenticação
@@ -28,5 +30,9 @@ router.post("/login", login);
 
 // Buscar dados do utilizador autenticado
 router.get("/me", authMiddleware, getMe);
+
+// Recuperação de password
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
 
 module.exports = router;

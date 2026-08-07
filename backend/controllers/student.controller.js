@@ -1,46 +1,80 @@
+const { Op } = require("sequelize");
 const { Student, User } = require("../models");
-const generateStudentCode = require("../utils/generateStudentCode");
 const registerLogAudit = require("../utils/logAudit");
+
+async function validateStudentData({ idNumber, userId, studentId = null }) {
+  if (idNumber) {
+    const conflictDoc = await Student.findOne({
+      where: {
+        idNumber,
+        ...(studentId && { id: { [Op.ne]: studentId } })
+      },
+      attributes: ['id']
+    });
+    if (conflictDoc) throw new Error("A student with this ID number already exists.");
+  }
+
+  if (userId) {
+    const user = await User.findByPk(userId, { attributes: ['id', 'role'] });
+    if (!user) throw new Error("The user linked to this student was not found.");
+    if (user.role !== "STUDENT") throw new Error("The linked user must have the role of STUDENT.");
+
+    const conflictUser = await Student.findOne({
+      where: {
+        userId,
+        ...(studentId && { id: { [Op.ne]: studentId } })
+      },
+      attributes: ['id']
+    });
+    if (conflictUser) throw new Error("This user is already linked to another student.");
+  }
+}
+
+function errorTreatment(res, error, standardMessage) {
+  const map = {
+    "A student with this ID number already exists.": { status: 400, message: error.message },
+    "The user linked to this student was not found.": { status: 404, message: error.message },
+    "The linked user must have the role of STUDENT.": { status: 400, message: error.message },
+    "This user is already linked to another student.": { status: 400, message: error.message },
+  };
+
+  const knownError = map[error.message];
+  if (knownError) {
+    return res.status(knownError.status).json({ message: knownError.message });
+  }
+
+  console.error('[Error]: ${standardMessage}', error);
+  return res.status(500).json({ message: standardMessage });
+}
+
 
 // Listar todos os estudantes
 async function getAllStudents(req, res) {
   try {
     const students = await Student.findAll({
+      include: [{ model: User, as: "user", required: false, attributes: ["id", "name", "email", "role", "active"] }],
       order: [["id", "DESC"]],
     });
-
     return res.status(200).json(students);
   } catch (error) {
     console.error("Error fetching students:", error);
-
     return res.status(500).json({
-      message: "An error occurred while fetching students.",
-      error: error.message,
-    });
+      message: "An error occurred while fetching students." });
   }
 }
 
 // Buscar estudante por ID
 async function getStudentById(req, res) {
   try {
-    const { id } = req.params;
+    const student = await Student.findByPk(req.params.id, {
+      include: [{ model: User, as: "user", required: false, attributes: ["id", "name", "email", "role", "active"] }],
+    });
 
-    const student = await Student.findByPk(id);
-
-    if (!student) {
-      return res.status(404).json({
-        message: "Student not found.",
-      });
-    }
-
+    if (!student) return res.status(404).json({ message: "Student not found." });
     return res.status(200).json(student);
   } catch (error) {
-    console.error("Error fetching student:", error);
-
-    return res.status(500).json({
-      message: "An error occurred while fetching the student.",
-      error: error.message,
-    });
+    console.error("[Error fetching student]:", error);
+    return res.status(500).json({ message: "An error occurred while fetching the student." });
   }
 }
 
@@ -48,6 +82,9 @@ async function getStudentById(req, res) {
 async function updateStudent(req, res) {
   try {
     const { id } = req.params;
+    const student = await Student.findByPk(id);
+    if (!student) return res.status(404).json({ message: "Student not found." });
+    
 
     const {
       name,
@@ -61,23 +98,11 @@ async function updateStudent(req, res) {
       userId,
     } = req.body;
 
-    const student = await Student.findByPk(id);
-
-    if (!student) {
-      return res.status(404).json({
-        message: "Student not found.",
-      });
-    }
-
-    if (userId) {
-      const user = await User.findByPk(userId);
-
-      if (!user) {
-        return res.status(404).json({
-          message: "User linked to this student was not found.",
-        });
-      }
-    }
+    await validateStudentData({
+      idNumber: idNumber !== undefined ? idNumber : student.idNumber,
+      userId: userId !== undefined ? userId : student.userId,
+      studentId: student.id,
+    });
 
     await student.update({
       name: name ?? student.name,
@@ -91,45 +116,41 @@ async function updateStudent(req, res) {
       userId: userId ?? student.userId,
     });
 
-    return res.status(200).json({
-      message: "Student updated successfully.",
-      student,
+    await registerLogAudit({
+      userId: req.user.id,
+      action: "UPDATE",
+      entity: "Student",
+      entityId: student.id,
+      description: `Updated student with ID ${student.id}`,
     });
-  } catch (error) {
-    console.error("Error updating student:", error);
 
-    return res.status(500).json({
-      message: "An error occurred while updating the student.",
-      error: error.message,
-    });
+    return res.status(200).json({ message: "Student updated successfully.", student});
+  } catch (error) {
+    return errorTreatment(res, error, "An error occurred while updating the student.");
   }
 }
 
 // Apagar estudante
 async function deleteStudent(req, res) {
   try {
-    const { id } = req.params;
-
-    const student = await Student.findByPk(id);
-
-    if (!student) {
-      return res.status(404).json({
-        message: "Student not found.",
-      });
-    }
-
+    
+    const student = await Student.findByPk(req.params.id);
+    if (!student) return res.status(404).json({ message: "Student not found." });
+    
     await student.destroy();
 
-    return res.status(200).json({
-      message: "Student deleted successfully.",
+    await registerLogAudit({
+      userId: req.user.id,
+      action: "DELETE",
+      entity: "Student",
+      entityId: student.id,
+      description: `Deleted student with ID ${student.id}`,
     });
-  } catch (error) {
-    console.error("Error deleting student:", error);
 
-    return res.status(500).json({
-      message: "An error occurred while deleting the student.",
-      error: error.message,
-    });
+    return res.status(200).json({ message: "Student deleted successfully." });
+  } catch (error) {
+    console.error("[Error deleting student]:", error);
+    return res.status(500).json({ message: "An error occurred while deleting the student." });
   }
 }
 

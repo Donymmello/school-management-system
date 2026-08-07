@@ -1,8 +1,9 @@
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
-const { User, Student, Teacher, Staff } = require("../models");
-const generateStudentCode = require("../utils/generateStudentCode");
-const generateEmployeeCode = require("../utils/generateEmployeeCode");
+const { Op } = require("sequelize");
+const { User, Student, Teacher, Staff, School, PasswordResetToken, sequelize } = require("../models");
+const { generateStudentCode, generateEmployeeCode } = require("../utils/generateCode");
 const registerLogAudit = require("../utils/logAudit");
 
 const generateToken = (user) => {
@@ -12,11 +13,21 @@ const generateToken = (user) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      schoolId: user.schoolId,
     },
     process.env.JWT_SECRET,
     { expiresIn: "1d" }
   );
 };
+
+const mapUserToResponse = (user) => ({
+  id: user.id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  schoolId: user.schoolId,
+  active: user.active,
+});
 
 const bootstrapAdmin = async (req, res) => {
   try {
@@ -28,19 +39,16 @@ const bootstrapAdmin = async (req, res) => {
       });
     }
 
-    const adminExistente = await User.findOne({
-      where: { role: "ADMIN" },
-    });
+    const [adminExisting, existingUser] = await Promise.all([
+      User.findOne({ where: { role: "ADMIN" }, attributes: ["id"] }),
+      User.findOne({ where: { email }, attributes: ["id"] }),
+    ]);
 
-    if (adminExistente) {
+    if (adminExisting) {
       return res.status(403).json({
         message: "There is already at least one ADMIN in the system.",
       });
     }
-
-    const existingUser = await User.findOne({
-      where: { email },
-    });
 
     if (existingUser) {
       return res.status(409).json({
@@ -70,120 +78,11 @@ const bootstrapAdmin = async (req, res) => {
 
     return res.status(201).json({
       message: "Initial administrator created successfully.",
-      user: {
-        id: user.id,
-        employeeCode: user.employeeCode,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        active: user.active,
-      },
+      user: mapUserToResponse(user),
     });
   } catch (error) {
-    console.error("Error creating initial administrator:", error);
-
-    return res.status(500).json({
-      message: "Error occurred while creating initial administrator.",
-      error: error.message,
-    });
-  }
-};
-
-const registerStudent = async (req, res) => {
-  try {
-    const {
-      name,
-      email,
-      password,
-      birthday,
-      grade,
-      telephone,
-      idCard,
-      idNumber,
-    } = req.body;
-
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        message: "Name, email and password are required.",
-      });
-    }
-
-    const existingUser = await User.findOne({ where: { email } });
-
-    if (existingUser) {
-      return res.status(409).json({
-        message: "Email already in use.",
-      });
-    }
-
-    const existingStudentByEmail = await Student.findOne({
-      where: { email },
-    });
-
-    if (existingStudentByEmail) {
-      return res.status(409).json({
-        message: "A student with this email already exists.",
-      });
-    }
-
-    if (idNumber) {
-      const existingStudentByIdNumber = await Student.findOne({
-        where: { idNumber },
-      });
-
-      if (existingStudentByIdNumber) {
-        return res.status(409).json({
-          message: "A student with this ID number already exists.",
-        });
-      }
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    const user = await User.create({
-      employeeCode: null,
-      name,
-      email,
-      passwordHash,
-      role: "STUDENT",
-      active: true,
-    });
-
-    const studentCode = await generateStudentCode();
-
-    const student = await Student.create({
-      studentCode,
-      userId: user.id,
-      name,
-      email,
-      birthday: birthday || null,
-      grade: grade || null,
-      telephone: telephone || null,
-      idCard: idCard || null,
-      idNumber: idNumber || null,
-    });
-
-    const token = generateToken(user);
-
-    return res.status(201).json({
-      message: "Student registered successfully.",
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        active: user.active,
-      },
-      student,
-    });
-  } catch (error) {
-    console.error("Error registering student:", error);
-
-    return res.status(500).json({
-      message: "Error registering student.",
-      error: error.message,
-    });
+    console.error("[Bootstrap Error]:", error);
+    return res.status(500).json({ message: "Error occurred while creating the initial administrator." });
   }
 };
 
@@ -194,7 +93,6 @@ const registerUser = async (req, res) => {
       email,
       password,
       role,
-
       birthday,
       grade,
       telephone,
@@ -202,7 +100,6 @@ const registerUser = async (req, res) => {
       idNumber,
       position,
       department,
-
       subject,
     } = req.body;
 
@@ -234,7 +131,20 @@ const registerUser = async (req, res) => {
       });
     }
 
-    const existingUser = await User.findOne({ where: { email } });
+    const [existingUser, existingStudent] = await Promise.all([
+      User.findOne({ where: { email }, attributes: ["id"] }),
+      role === "STUDENT"
+        ? Student.findOne({
+            where: {
+              [Op.or]: [
+                { email },
+                ...(idNumber ? [{ idNumber }] : []),
+              ],
+            },
+            attributes: ["id", "email", "idNumber"],
+          })
+        : null,
+    ]);
 
     if (existingUser) {
       return res.status(409).json({
@@ -242,113 +152,210 @@ const registerUser = async (req, res) => {
       });
     }
 
-    if (role === "STUDENT") {
-      const existingStudentByEmail = await Student.findOne({
-        where: { email },
-      });
-
-      if (existingStudentByEmail) {
-        return res.status(409).json({
-          message: "A student with this email already exists.",
-        });
+    if (existingStudent) {
+      if (existingStudent.email === email) {
+        return res.status(409).json({ message: "A student with this email already exists." });
       }
-
-      if (idNumber) {
-        const existingStudentByIdNumber = await Student.findOne({
-          where: { idNumber },
-        });
-
-        if (existingStudentByIdNumber) {
-          return res.status(409).json({
-            message: "A student with this ID number already exists.",
-          });
-        }
-      }
+      return res.status(409).json({ message: "A student with this ID number already exists." });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const employeeCode = role === "STUDENT" ? null : await generateEmployeeCode();
 
-    const employeeCode =
-      role === "STUDENT" ? null : await generateEmployeeCode();
+    const result = await sequelize.transaction(async (t) => {
+      const user = await User.create(
+        {
+          employeeCode,
+          name,
+          email,
+          passwordHash,
+          role,
+          active: true,
+        },
+        { transaction: t }
+      );
 
-    const user = await User.create({
-      employeeCode,
-      name,
-      email,
-      passwordHash,
-      role,
-      active: true,
-    });
+      let student = null;
+      let teacher = null;
+      let staff = null;
 
-    let student = null;
-    let teacher = null;
-    let staff = null;
+      if (role === "STUDENT") {
+        const studentCode = await generateStudentCode();
+        student = await Student.create(
+          {
+            studentCode,
+            userId: user.id,
+            name,
+            email,
+            birthday: birthday || null,
+            grade: grade || null,
+            telephone: telephone || null,
+            idCard: idCard || null,
+            idNumber: idNumber || null,
+          },
+          { transaction: t }
+        );
+      }
 
-    if (role === "STUDENT") {
-      const studentCode = await generateStudentCode();
+      if (role === "TEACHER") {
+        teacher = await Teacher.create(
+          {
+            employeeCode,
+            userId: user.id,
+            name,
+            email,
+            subject: subject || null,
+          },
+          { transaction: t }
+        );
+      }
 
-      student = await Student.create({
-        studentCode,
-        userId: user.id,
-        name,
-        email,
-        birthday: birthday || null,
-        grade: grade || null,
-        telephone: telephone || null,
-        idCard: idCard || null,
-        idNumber: idNumber || null,
-      });
-    }
+      if (role === "STAFF") {
+        staff = await Staff.create(
+          {
+            userId: user.id,
+            employeeCode,
+            name,
+            email,
+            position: position || "Staff",
+            department: department || null,
+          },
+          { transaction: t }
+        );
+      }
 
-    if (role === "TEACHER") {
-      teacher = await Teacher.create({
-        employeeCode,
-        userId: user.id,
-        name,
-        email,
-        subject: subject || null,
-      });
-    }
+      await registerLogAudit(
+        {
+          userId: req.user.id,
+          action: "REGISTER_USER",
+          entity: "User",
+          entityId: user.id,
+          description: `User registered with email ${user.email} and role ${user.role}.`,
+        },
+        { transaction: t }
+      );
 
-    if (role === "STAFF") {
-  staff = await Staff.create({
-    userId: user.id,
-    employeeCode,
-    name,
-    email,
-    position: position || "Staff",
-    department: department || null,
-  });
-}
-
-    await registerLogAudit({
-      userId: req.user.id,
-      action: "REGISTER_USER",
-      entity: "User",
-      entityId: user.id,
-      description: `User registered with email ${user.email} and role ${user.role}.`,
+      return { user, student, teacher, staff };
     });
 
     return res.status(201).json({
       message: "User registered successfully.",
-      user: {
-        id: user.id,
-        employeeCode: user.employeeCode,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        active: user.active,
-      },
-      student,
-      teacher,
-      staff,
+      user: mapUserToResponse(result.user),
+      student: result.student,
+      teacher: result.teacher,
+      staff: result.staff,
     });
   } catch (error) {
-    console.error("Error registering user:", error);
+    console.error("[Error registering user]:", error);
+    return res.status(500).json({ message: "Error occurred while registering user." });
+  }
+};
 
+const registerStudent = async (req, res) => {
+  try {
+    const {
+      name,
+      email,
+      password,
+      birthday,
+      grade,
+      telephone,
+      idCard,
+      idNumber,
+    } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        message: "Name, email and password are required.",
+      });
+    }
+
+    // 2. CORREÇÃO: Removido o User.findOne isolado que duplicava a variável 'existingUser'
+    const [existingUser, existingStudent] = await Promise.all([
+      User.findOne({ where: { email }, attributes: ["id"] }),
+      Student.findOne({
+        where: {
+          [Op.or]: [
+            ...(idCard ? [{ idCard }] : []),
+            ...(idNumber ? [{ idNumber }] : []),
+          ],
+        },
+        attributes: ["id", "idCard", "idNumber"],
+      }),
+    ]);
+
+    if (existingUser) return res.status(409).json({ message: "Email already in use." });
+
+    if (existingStudent) {
+      const msg =
+        existingStudent.idCard === idCard
+          ? "A student with this ID card already exists."
+          : "A student with this ID number already exists.";
+      return res.status(409).json({ message: msg });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const result = await sequelize.transaction(async (t) => {
+      const user = await User.create(
+        {
+          employeeCode: null,
+          name,
+          email,
+          passwordHash,
+          role: "STUDENT",
+          active: true,
+        },
+        { transaction: t }
+      );
+
+      const studentCode = await generateStudentCode();
+
+      const student = await Student.create(
+        {
+          studentCode,
+          userId: user.id,
+          name,
+          email,
+          birthday: birthday || null,
+          grade: grade || null,
+          telephone: telephone || null,
+          idCard: idCard || null,
+          idNumber: idNumber || null,
+        },
+        { transaction: t }
+      );
+
+      // CORREÇÃO: Tratamento para evitar quebra caso registerStudent seja uma rota pública (sem req.user)
+      await registerLogAudit(
+        {
+          userId: req.user ? req.user.id : user.id,
+          action: "REGISTER_STUDENT",
+          entity: "Student",
+          entityId: student.id,
+          description: `Student registered with email ${student.email}.`,
+        },
+        { transaction: t }
+      );
+
+      return { user, student };
+    });
+
+    return res.status(201).json({
+      message: "Student registered successfully.",
+      token: generateToken(result.user),
+      user: mapUserToResponse(result.user),
+      student: {
+        id: result.student.id,
+        studentCode: result.student.studentCode,
+        name: result.student.name,
+        userId: result.student.userId,
+      },
+    });
+  } catch (error) {
+    console.error("[Error registering student]:", error);
     return res.status(500).json({
-      message: "Error occurred while registering user.",
-      error: error.message,
+      message: "Error registering student.",
     });
   }
 };
@@ -363,7 +370,16 @@ const login = async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({
+      where: { email },
+      include: [
+        {
+          model: School,
+          as: "school",
+          attributes: ["id", "name", "address"],
+        },
+      ],
+    });
 
     if (!user) {
       return res.status(404).json({
@@ -398,27 +414,17 @@ const login = async (req, res) => {
     return res.status(200).json({
       message: "Login successful.",
       token,
-      user: {
-        id: user.id,
-        employeeCode: user.employeeCode,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        active: user.active,
-      },
+      user: mapUserToResponse(user),
     });
   } catch (error) {
-    console.error("Error during login:", error);
-
-    return res.status(500).json({
-      message: "Internal error occurred while logging in.",
-      error: error.message,
-    });
+    console.error("[Error during login]:", error);
+    return res.status(500).json({ message: "Internal error occurred while logging in." });
   }
 };
 
 const getMe = async (req, res) => {
   try {
+    // 3. CORREÇÃO: Ajustados atributos para convenção padrão Sequelize (createdAt/updatedAt)
     const user = await User.findByPk(req.user.id, {
       attributes: [
         "id",
@@ -432,20 +438,63 @@ const getMe = async (req, res) => {
       ],
     });
 
-    if (!user) {
-      return res.status(404).json({
-        message: "User not found.",
-      });
-    }
-
+    if (!user) return res.status(404).json({ message: "User not found." });
     return res.status(200).json(user);
   } catch (error) {
-    console.error("Error fetching profile:", error);
+    console.error("[Error fetching profile]:", error);
+    return res.status(500).json({ message: "Internal error occurred while fetching profile." });
+  }
+};
 
-    return res.status(500).json({
-      message: "Internal error occurred while fetching profile.",
-      error: error.message,
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email é obrigatório." });
+
+    const user = await User.findOne({ where: { email }, attributes: ["id"] });
+
+    if (!user) {
+      return res.status(200).json({ message: "Se o email existir, receberá instruções para redefinição." });
+    }
+
+    const token = crypto.randomBytes(20).toString("hex");
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await PasswordResetToken.create({ userId: user.id, token, expiresAt });
+
+    const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+    console.log(`[DEV ONLY] Link de Reset: ${resetLink}`);
+
+    return res.status(200).json({ message: "Se o email existir, receberá instruções para redefinição." });
+  } catch (error) {
+    console.error("[ForgotPassword Error]:", error);
+    return res.status(500).json({ message: "Erro interno." });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) return res.status(400).json({ message: "Token e password são obrigatórios" });
+
+    const resetToken = await PasswordResetToken.findOne({ where: { token, used: false } });
+
+    if (!resetToken || new Date() > resetToken.expiresAt) {
+      return res.status(400).json({ message: "Token inválido ou expirado." });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await sequelize.transaction(async (t) => {
+      await User.update({ passwordHash: hashedPassword }, { where: { id: resetToken.userId }, transaction: t });
+      resetToken.used = true;
+      await resetToken.save({ transaction: t });
     });
+
+    return res.status(200).json({ message: "Password redefinida com sucesso." });
+  } catch (error) {
+    console.error("[ResetPassword Error]:", error);
+    return res.status(500).json({ message: "Erro interno." });
   }
 };
 
@@ -455,4 +504,6 @@ module.exports = {
   registerUser,
   login,
   getMe,
+  forgotPassword,
+  resetPassword,
 };

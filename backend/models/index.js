@@ -4,6 +4,8 @@ const User = require("./user");
 const Student = require("./student");
 const Teacher = require("./teacher");
 const Staff = require("./staff");
+const School = require("./school");
+const PasswordResetToken = require("./passwordResetToken");
 
 const Attendance = require("./attendance");
 const Grade = require("./grade");
@@ -21,6 +23,34 @@ const Schedule = require("./schedule");
 const Classroom = require("./classroom");
 
 const LogAudit = require("./logAudit");
+
+/*
+  ======================================================
+  SCHOOL RELATIONS
+  ======================================================
+*/
+
+// School 1 - N User
+School.hasMany(User, {
+  foreignKey: "schoolId",
+  as: "users",
+});
+
+User.belongsTo(School, {
+  foreignKey: "schoolId",
+  as: "school",
+});
+
+// User 1 - N PasswordResetToken
+User.hasMany(PasswordResetToken, {
+  foreignKey: "userId",
+  as: "passwordResetTokens",
+});
+
+PasswordResetToken.belongsTo(User, {
+  foreignKey: "userId",
+  as: "user",
+});
 
 /*
   ======================================================
@@ -375,6 +405,8 @@ module.exports = {
   Student,
   Teacher,
   Staff,
+  School,
+  PasswordResetToken,
 
   Attendance,
   Grade,

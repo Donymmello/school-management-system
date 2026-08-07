@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  school:
+    image: mysql:8.0
+    container_name: meu_mysql
+    env_file:
+      - ./backend/.env
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASS}
+      MYSQL_DATABASE: ${DB_NAME}
+    ports:
+      - "3306:3306"
+    volumes:
+      - dados_mysql:/var/lib/mysql
+
+  api_backend:
+    build: ./backend
+    container_name: meu_backend
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./backend/upload:/app/upload
+      - ./backend/upload/comprovativos:/app/upload/comprovativos
+    depends_on:
+      - school
+
+  web_frontend:
+    build: ./frontend
+    container_name: frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - api_backend
+
+volumes:
+  dados_mysql:

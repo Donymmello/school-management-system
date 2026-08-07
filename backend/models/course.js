@@ -12,6 +12,12 @@ const Course = sequelize.define(
       unique: true,
     },
 
+    schoolId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: "school_id",
+    },
+
     name: {
       type: DataTypes.ENUM(
         "SOFTWARE_ENGINEERING",

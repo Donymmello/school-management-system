@@ -23,6 +23,12 @@ const Student = sequelize.define(
       field: "user_id",
     },
 
+    schoolId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: "school_id",
+    },
+
     classroomId: {
       type: DataTypes.INTEGER,
       allowNull: true,

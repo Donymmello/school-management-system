@@ -14,6 +14,12 @@ const User = sequelize.define(
       primaryKey: true,
     },
 
+    schoolId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: "school_id",
+    },
+
     name: {
       type: DataTypes.STRING(150),
       allowNull: false,
