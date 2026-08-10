@@ -1,9 +1,9 @@
-version: '3.8'
+name: school-management-system
 
 services:
   school:
     image: mysql:8.0
-    container_name: meu_mysql
+    container_name: sms_mysql
     env_file:
       - ./backend/.env
     restart: always
@@ -13,11 +13,19 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - dados_mysql:/var/lib/mysql
+      - sms_mysql_data:/var/lib/mysql
+    # sem isso, "depends_on" só espera o container do mysql existir, não o
+    # servidor estar pronto pra aceitar conexão (o primeiro boot demora minutos
+    # inicializando os arquivos do banco)
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${DB_PASS}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
 
   api_backend:
     build: ./backend
-    container_name: meu_backend
+    container_name: sms_backend
     ports:
       - "5000:5000"
     env_file:
@@ -28,13 +36,19 @@ services:
       - ./backend/upload:/app/upload
       - ./backend/upload/comprovativos:/app/upload/comprovativos
     depends_on:
-      - school
+      school:
+        condition: service_healthy
+    # se cair por qualquer motivo transitório (ex: mysql reiniciar), volta sozinho
+    restart: unless-stopped
 
   web_frontend:
     build: ./frontend
-    container_name: frontend
+    container_name: sms_frontend
     ports:
       - "5173:5173"
+    environment:
+      # dentro da rede do compose o backend não é "localhost", é o nome do serviço
+      VITE_API_PROXY_TARGET: http://api_backend:5000
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -42,4 +56,4 @@ services:
       - api_backend
 
 volumes:
-  dados_mysql:
+  sms_mysql_data:

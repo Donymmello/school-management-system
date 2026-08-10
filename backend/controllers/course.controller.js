@@ -1,9 +1,15 @@
 const { Course } = require("../models");
 const generateCourseCode = require("../utils/generateCourseCode");
+const { tenantWhere } = require("../utils/tenantScope");
+const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
 
 async function createCourse(req, res) {
   try {
     const { name, displayName, faculty, durationYears, degreeLevel, active } = req.body;
+
+    if (!req.schoolId) {
+      return res.status(400).json({ message: "schoolId is required to create a course." });
+    }
 
     if (!name || !displayName || !faculty) {
       return res.status(400).json({
@@ -11,7 +17,7 @@ async function createCourse(req, res) {
       });
     }
 
-    const existingCourse = await Course.findOne({ where: { name, faculty } });
+    const existingCourse = await Course.findOne({ where: tenantWhere(req, { name, faculty }) });
 
     if (existingCourse) {
       return res.status(409).json({
@@ -31,6 +37,7 @@ async function createCourse(req, res) {
     }
 
     const course = await Course.create({
+      schoolId: req.schoolId,
       code,
       name,
       displayName,
@@ -45,6 +52,7 @@ async function createCourse(req, res) {
       course,
     });
   } catch (error) {
+    if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
     console.error("Error creating course:", error);
 
     return res.status(500).json({
@@ -65,7 +73,7 @@ async function getAllCourses(req, res) {
     if (degreeLevel) where.degreeLevel = degreeLevel;
 
     const courses = await Course.findAll({
-      where,
+      where: tenantWhere(req, where),
       order: [
         ["faculty", "ASC"],
         ["displayName", "ASC"],
@@ -83,7 +91,7 @@ async function getAllCourses(req, res) {
 
 async function getCourseById(req, res) {
   try {
-    const course = await Course.findByPk(req.params.id);
+    const course = await Course.findOne({ where: tenantWhere(req, { id: req.params.id }) });
 
     if (!course) {
       return res.status(404).json({ message: "Course not found." });
@@ -103,7 +111,7 @@ async function updateCourse(req, res) {
     const { id } = req.params;
     const { displayName, durationYears, degreeLevel, active } = req.body;
 
-    const course = await Course.findByPk(id);
+    const course = await Course.findOne({ where: tenantWhere(req, { id }) });
 
     if (!course) {
       return res.status(404).json({ message: "Course not found." });
@@ -130,7 +138,7 @@ async function updateCourse(req, res) {
 
 async function deactivateCourse(req, res) {
   try {
-    const course = await Course.findByPk(req.params.id);
+    const course = await Course.findOne({ where: tenantWhere(req, { id: req.params.id }) });
 
     if (!course) {
       return res.status(404).json({ message: "Course not found." });
@@ -152,7 +160,7 @@ async function deactivateCourse(req, res) {
 
 async function deleteCourse(req, res) {
   try {
-    const course = await Course.findByPk(req.params.id);
+    const course = await Course.findOne({ where: tenantWhere(req, { id: req.params.id }) });
 
     if (!course) {
       return res.status(404).json({ message: "Course not found." });

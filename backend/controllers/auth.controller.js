@@ -5,6 +5,7 @@ const { Op } = require("sequelize");
 const { User, Student, Teacher, Staff, School, PasswordResetToken, sequelize } = require("../models");
 const { generateStudentCode, generateEmployeeCode } = require("../utils/generateCode");
 const registerLogAudit = require("../utils/logAudit");
+const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
 
 const generateToken = (user) => {
   return jwt.sign(
@@ -27,8 +28,19 @@ const mapUserToResponse = (user) => ({
   role: user.role,
   schoolId: user.schoolId,
   active: user.active,
+  ...(user.school
+    ? {
+        school: {
+          id: user.school.id,
+          name: user.school.name,
+          address: user.school.address,
+          academicModel: user.school.academicModel,
+        },
+      }
+    : {}),
 });
 
+// Cria o dono da plataforma (SUPER_ADMIN, sem escola). Só existe um no sistema todo.
 const bootstrapAdmin = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -39,14 +51,14 @@ const bootstrapAdmin = async (req, res) => {
       });
     }
 
-    const [adminExisting, existingUser] = await Promise.all([
-      User.findOne({ where: { role: "ADMIN" }, attributes: ["id"] }),
+    const [superAdminExisting, existingUser] = await Promise.all([
+      User.findOne({ where: { role: "SUPER_ADMIN" }, attributes: ["id"] }),
       User.findOne({ where: { email }, attributes: ["id"] }),
     ]);
 
-    if (adminExisting) {
+    if (superAdminExisting) {
       return res.status(403).json({
-        message: "There is already at least one ADMIN in the system.",
+        message: "There is already a SUPER_ADMIN in the system.",
       });
     }
 
@@ -64,7 +76,8 @@ const bootstrapAdmin = async (req, res) => {
       name,
       email,
       passwordHash,
-      role: "ADMIN",
+      role: "SUPER_ADMIN",
+      schoolId: null,
       active: true,
     });
 
@@ -73,16 +86,17 @@ const bootstrapAdmin = async (req, res) => {
       action: "BOOTSTRAP_ADMIN",
       entity: "User",
       entityId: user.id,
-      description: `First administrator created with email ${user.email}.`,
+      description: `Platform SUPER_ADMIN created with email ${user.email}.`,
     });
 
     return res.status(201).json({
-      message: "Initial administrator created successfully.",
+      message: "Platform administrator created successfully.",
       user: mapUserToResponse(user),
     });
   } catch (error) {
+    if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
     console.error("[Bootstrap Error]:", error);
-    return res.status(500).json({ message: "Error occurred while creating the initial administrator." });
+    return res.status(500).json({ message: "Error occurred while creating the platform administrator." });
   }
 };
 
@@ -103,7 +117,7 @@ const registerUser = async (req, res) => {
       subject,
     } = req.body;
 
-    if (!req.user || req.user.role !== "ADMIN") {
+    if (!req.user || !["ADMIN", "SUPER_ADMIN"].includes(req.user.role)) {
       return res.status(403).json({
         message: "Only administrators can register users.",
       });
@@ -128,6 +142,19 @@ const registerUser = async (req, res) => {
       return res.status(400).json({
         message: "Invalid role.",
         permittedRoles,
+      });
+    }
+
+    // ADMIN só cria gente dentro da própria escola. SUPER_ADMIN não tem escola
+    // própria, então precisa indicar em qual escola o usuário entra.
+    const schoolId = req.user.role === "ADMIN" ? req.user.schoolId : req.body.schoolId;
+
+    if (!schoolId) {
+      return res.status(400).json({
+        message:
+          req.user.role === "ADMIN"
+            ? "Your admin account is not linked to a school."
+            : "schoolId is required when a SUPER_ADMIN registers a user.",
       });
     }
 
@@ -170,6 +197,7 @@ const registerUser = async (req, res) => {
           email,
           passwordHash,
           role,
+          schoolId,
           active: true,
         },
         { transaction: t }
@@ -185,6 +213,7 @@ const registerUser = async (req, res) => {
           {
             studentCode,
             userId: user.id,
+            schoolId,
             name,
             email,
             birthday: birthday || null,
@@ -202,6 +231,7 @@ const registerUser = async (req, res) => {
           {
             employeeCode,
             userId: user.id,
+            schoolId,
             name,
             email,
             subject: subject || null,
@@ -214,6 +244,7 @@ const registerUser = async (req, res) => {
         staff = await Staff.create(
           {
             userId: user.id,
+            schoolId,
             employeeCode,
             name,
             email,
@@ -246,6 +277,7 @@ const registerUser = async (req, res) => {
       staff: result.staff,
     });
   } catch (error) {
+    if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
     console.error("[Error registering user]:", error);
     return res.status(500).json({ message: "Error occurred while registering user." });
   }
@@ -262,12 +294,27 @@ const registerStudent = async (req, res) => {
       telephone,
       idCard,
       idNumber,
+      schoolId,
     } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({
         message: "Name, email and password are required.",
       });
+    }
+
+    if (!schoolId) {
+      // ponytail: rota pública sem noção de subdomínio/slug ainda — exige schoolId
+      // explícito no body. Trocar por resolução via slug/subdomínio quando o
+      // onboarding de escola (roadmap item 2) definir como o front informa o tenant.
+      return res.status(400).json({ message: "schoolId is required." });
+    }
+
+    const school = await School.findByPk(schoolId, {
+      attributes: ["id", "name", "address", "status", "academicModel"],
+    });
+    if (!school || school.status !== "ACTIVE") {
+      return res.status(404).json({ message: "School not found or inactive." });
     }
 
     // 2. CORREÇÃO: Removido o User.findOne isolado que duplicava a variável 'existingUser'
@@ -304,6 +351,7 @@ const registerStudent = async (req, res) => {
           email,
           passwordHash,
           role: "STUDENT",
+          schoolId,
           active: true,
         },
         { transaction: t }
@@ -315,6 +363,7 @@ const registerStudent = async (req, res) => {
         {
           studentCode,
           userId: user.id,
+          schoolId,
           name,
           email,
           birthday: birthday || null,
@@ -341,6 +390,10 @@ const registerStudent = async (req, res) => {
       return { user, student };
     });
 
+    // result.user não veio de uma query com include: [School] — anexa a
+    // instância já buscada acima pra validação, sem round-trip extra.
+    result.user.school = school;
+
     return res.status(201).json({
       message: "Student registered successfully.",
       token: generateToken(result.user),
@@ -353,6 +406,7 @@ const registerStudent = async (req, res) => {
       },
     });
   } catch (error) {
+    if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
     console.error("[Error registering student]:", error);
     return res.status(500).json({
       message: "Error registering student.",
@@ -376,7 +430,7 @@ const login = async (req, res) => {
         {
           model: School,
           as: "school",
-          attributes: ["id", "name", "address"],
+          attributes: ["id", "name", "address", "status", "academicModel"],
         },
       ],
     });
@@ -390,6 +444,15 @@ const login = async (req, res) => {
     if (!user.active) {
       return res.status(403).json({
         message: "User is inactive. Contact the administrator.",
+      });
+    }
+
+    // Bloqueio de acesso por escola inativa (inadimplência/suspensão) — ver
+    // docs/project-rules.md, roadmap item 4 (Billing). SUPER_ADMIN não tem
+    // escola (schoolId null), então nunca cai aqui.
+    if (user.school && user.school.status !== "ACTIVE") {
+      return res.status(403).json({
+        message: "This school's account is not active. Contact the platform administrator.",
       });
     }
 
@@ -429,12 +492,19 @@ const getMe = async (req, res) => {
       attributes: [
         "id",
         "employeeCode",
+        "schoolId",
         "name",
         "email",
         "role",
         "active",
         "created_at",
         "updated_at",
+      ],
+      // Precisa do include mesmo sem estar no getMe original: é o único jeito
+      // do front saber o academicModel da escola depois de um refresh de
+      // página (AuthContext chama fetchMe() no mount, não só no login()).
+      include: [
+        { model: School, as: "school", attributes: ["id", "name", "address", "academicModel"] },
       ],
     });
 
@@ -506,4 +576,6 @@ module.exports = {
   getMe,
   forgotPassword,
   resetPassword,
+  generateToken,
+  mapUserToResponse,
 };

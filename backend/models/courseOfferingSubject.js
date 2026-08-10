@@ -57,6 +57,9 @@ const CourseOfferingSubject = sequelize.define(
         timestamps: true,
         createdAt: "created_at",
         updatedAt: "updated_at",
+        // Uma disciplina não pode ser atribuída duas vezes à mesma oferta —
+        // garantia real é essa constraint (ver docs/project-rules.md, seção 0).
+        indexes: [{ unique: true, fields: ["course_offering_id", "subject_id"] }],
     }
 );
 

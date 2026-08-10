@@ -10,16 +10,23 @@ const Classroom = sequelize.define(
       primaryKey: true,
     },
 
+    schoolId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: "school_id",
+      unique: ["classroom_school_code", "classroom_school_name"],
+    },
+
     code: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      unique: true,
+      unique: "classroom_school_code",
     },
 
     name: {
       type: DataTypes.STRING(100),
       allowNull: false,
-      unique: true,
+      unique: "classroom_school_name",
     },
 
     block: {

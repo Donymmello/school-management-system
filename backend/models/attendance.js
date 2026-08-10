@@ -3,7 +3,7 @@ const sequelize = require('../config/db');
 
 
 const Attendance = sequelize.define(
-  "Attendace",
+  "Attendance",
   {
     id: {
       type: DataTypes.INTEGER,
@@ -16,21 +16,24 @@ const Attendance = sequelize.define(
       field: "student_id",
     },
     date: {
-      type: DataTypes.DATE,
+      type: DataTypes.DATEONLY,
       allowNull: false,
       field: "date",
     },
-    present: {
-      type: DataTypes.STRING,
+    status: {
+      type: DataTypes.ENUM("PRESENT", "ABSENT", "LATE", "JUSTIFIED"),
       allowNull: false,
-      field: "present",
+      defaultValue: "PRESENT",
+      field: "status",
     },
   },
   {
     tableName: "attendance",
     timestamps: true,
-    createAt: "created_at",
-    updateAt: false,
+    createdAt: "created_at",
+    updatedAt: false,
+    // Um aluno só pode ter um registro de frequência por dia.
+    indexes: [{ unique: true, fields: ["student_id", "date"] }],
   }
 );
 

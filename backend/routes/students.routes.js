@@ -4,6 +4,7 @@ const router = express.Router();
 
 const authMiddleware = require("../middleware/auth.middleware");
 const authorizeRoles = require("../middleware/role.middleware");
+const requireSchool = require("../middleware/tenant.middleware");
 
 
 const {
@@ -14,27 +15,31 @@ const {
 } = require('../controllers/student.controller');
 
 router.get(
-  '/', 
+  '/',
   authMiddleware,
-  authorizeRoles("ADMIN", "DIRECTOR"),
+  authorizeRoles("SUPER_ADMIN", "ADMIN", "DIRECTOR"),
+  requireSchool,
   getAllStudents
 );
 router.get(
-  '/:id', 
+  '/:id',
   authMiddleware,
-  authorizeRoles("ADMIN", "DIRECTOR"),
+  authorizeRoles("SUPER_ADMIN", "ADMIN", "DIRECTOR"),
+  requireSchool,
   getStudentById
 );
 router.patch(
-  '/:id', 
+  '/:id',
   authMiddleware,
-  authorizeRoles("ADMIN", "DIRECTOR"),
+  authorizeRoles("SUPER_ADMIN", "ADMIN", "DIRECTOR"),
+  requireSchool,
   updateStudent
 );
 router.delete(
-  '/:id', 
+  '/:id',
   authMiddleware,
-  authorizeRoles("ADMIN", "DIRECTOR"),
+  authorizeRoles("SUPER_ADMIN", "ADMIN", "DIRECTOR"),
+  requireSchool,
   deleteStudent
 );
 

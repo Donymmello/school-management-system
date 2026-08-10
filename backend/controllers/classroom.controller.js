@@ -1,11 +1,17 @@
 const { Classroom } = require("../models");
 const generateClassroomCode = require("../utils/generateClassroomCode");
+const { tenantWhere } = require("../utils/tenantScope");
+const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
 
 const allowedTypes = ["NORMAL", "LAB", "AUDITORIUM", "OFFICE", "OTHER"];
 
 async function createClassroom(req, res) {
   try {
     const { name, block, capacity, type, active } = req.body;
+
+    if (!req.schoolId) {
+      return res.status(400).json({ message: "schoolId is required to create a classroom." });
+    }
 
     if (!name) {
       return res.status(400).json({
@@ -25,7 +31,7 @@ async function createClassroom(req, res) {
     const normalizedBlock = block ? String(block).trim().toUpperCase() : null;
 
     const existingClassroom = await Classroom.findOne({
-      where: { name },
+      where: tenantWhere(req, { name }),
     });
 
     if (existingClassroom) {
@@ -40,6 +46,7 @@ async function createClassroom(req, res) {
     });
 
     const classroom = await Classroom.create({
+      schoolId: req.schoolId,
       code,
       name,
       block: normalizedBlock,
@@ -53,6 +60,7 @@ async function createClassroom(req, res) {
       classroom,
     });
   } catch (error) {
+    if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
     console.error("Error creating classroom:", error);
 
     return res.status(500).json({
@@ -81,7 +89,7 @@ async function getAllClassrooms(req, res) {
     }
 
     const classrooms = await Classroom.findAll({
-      where,
+      where: tenantWhere(req, where),
       order: [
         ["block", "ASC"],
         ["type", "ASC"],
@@ -104,7 +112,7 @@ async function getClassroomById(req, res) {
   try {
     const { id } = req.params;
 
-    const classroom = await Classroom.findByPk(id);
+    const classroom = await Classroom.findOne({ where: tenantWhere(req, { id }) });
 
     if (!classroom) {
       return res.status(404).json({
@@ -128,7 +136,7 @@ async function updateClassroom(req, res) {
     const { id } = req.params;
     const { name, block, capacity, type, active } = req.body;
 
-    const classroom = await Classroom.findByPk(id);
+    const classroom = await Classroom.findOne({ where: tenantWhere(req, { id }) });
 
     if (!classroom) {
       return res.status(404).json({
@@ -145,7 +153,7 @@ async function updateClassroom(req, res) {
 
     if (name && name !== classroom.name) {
       const existingClassroom = await Classroom.findOne({
-        where: { name },
+        where: tenantWhere(req, { name }),
       });
 
       if (existingClassroom) {
@@ -186,6 +194,7 @@ async function updateClassroom(req, res) {
       classroom,
     });
   } catch (error) {
+    if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
     console.error("Error updating classroom:", error);
 
     return res.status(500).json({
@@ -199,7 +208,7 @@ async function deactivateClassroom(req, res) {
   try {
     const { id } = req.params;
 
-    const classroom = await Classroom.findByPk(id);
+    const classroom = await Classroom.findOne({ where: tenantWhere(req, { id }) });
 
     if (!classroom) {
       return res.status(404).json({
@@ -229,7 +238,7 @@ async function deleteClassroom(req, res) {
   try {
     const { id } = req.params;
 
-    const classroom = await Classroom.findByPk(id);
+    const classroom = await Classroom.findOne({ where: tenantWhere(req, { id }) });
 
     if (!classroom) {
       return res.status(404).json({

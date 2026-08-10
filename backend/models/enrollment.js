@@ -54,6 +54,10 @@ const Enrollment = sequelize.define(
         timestamps: true,
         createdAt: "created_at",
         updatedAt: "updated_at",
+        // Um aluno não pode ter duas matrículas na mesma oferta — a garantia
+        // real é essa constraint (ver docs/project-rules.md, seção 0), o
+        // catch de SequelizeUniqueConstraintError no controller é só UX.
+        indexes: [{ unique: true, fields: ["student_id", "course_offering_id"] }],
     }
 );
 

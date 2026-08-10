@@ -3,6 +3,8 @@ const router = express.Router();
 
 const authMiddleware = require("../middleware/auth.middleware");
 const authorizeRoles = require("../middleware/role.middleware");
+const requireSchool = require("../middleware/tenant.middleware");
+const requireAcademicModel = require("../middleware/academicModel.middleware");
 
 const {
   recordScore,
@@ -16,6 +18,8 @@ router.post(
     "SUPER_ADMIN",
     "TEACHER"
   ),
+  requireSchool,
+  requireAcademicModel("HIGHER_ED"),
   recordScore
 );
 

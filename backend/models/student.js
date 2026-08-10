@@ -20,6 +20,7 @@ const Student = sequelize.define(
     userId: {
       type: DataTypes.INTEGER,
       allowNull: true,
+      unique: true,
       field: "user_id",
     },
 
@@ -67,12 +68,14 @@ const Student = sequelize.define(
     idCard: {
       type: DataTypes.STRING(50),
       allowNull: true,
+      unique: true,
       field: "id_card",
     },
-    
+
     idNumber: {
       type: DataTypes.STRING(100),
       allowNull: true,
+      unique: true,
       field: "id_number",
     },
 

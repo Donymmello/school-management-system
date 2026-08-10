@@ -11,6 +11,7 @@ const Attendance = require("./attendance");
 const Grade = require("./grade");
 const Assessment = require("./assessment");
 const StudentAssessment = require("./studentAssessment");
+const AcademicPolicy = require("./academicPolicy");
 
 const Subject = require("./subject");
 
@@ -40,6 +41,34 @@ User.belongsTo(School, {
   foreignKey: "schoolId",
   as: "school",
 });
+
+// School 1 - N Student
+School.hasMany(Student, { foreignKey: "schoolId", as: "students" });
+Student.belongsTo(School, { foreignKey: "schoolId", as: "school" });
+
+// School 1 - N Teacher
+School.hasMany(Teacher, { foreignKey: "schoolId", as: "teachers" });
+Teacher.belongsTo(School, { foreignKey: "schoolId", as: "school" });
+
+// School 1 - N Staff
+School.hasMany(Staff, { foreignKey: "schoolId", as: "staffMembers" });
+Staff.belongsTo(School, { foreignKey: "schoolId", as: "school" });
+
+// School 1 - N Course
+School.hasMany(Course, { foreignKey: "schoolId", as: "courses" });
+Course.belongsTo(School, { foreignKey: "schoolId", as: "school" });
+
+// School 1 - N Classroom
+School.hasMany(Classroom, { foreignKey: "schoolId", as: "classrooms" });
+Classroom.belongsTo(School, { foreignKey: "schoolId", as: "school" });
+
+// School 1 - N Subject
+School.hasMany(Subject, { foreignKey: "schoolId", as: "subjects" });
+Subject.belongsTo(School, { foreignKey: "schoolId", as: "school" });
+
+// School 1 - N AcademicPolicy
+School.hasMany(AcademicPolicy, { foreignKey: "schoolId", as: "academicPolicies" });
+AcademicPolicy.belongsTo(School, { foreignKey: "schoolId", as: "school" });
 
 // User 1 - N PasswordResetToken
 User.hasMany(PasswordResetToken, {
@@ -414,6 +443,7 @@ module.exports = {
   Subject,
   Assessment,
   StudentAssessment,
+  AcademicPolicy,
 
   Course,
   CourseOffering,

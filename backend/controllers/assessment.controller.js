@@ -1,7 +1,21 @@
 const {
     Assessment,
     CourseOfferingSubject,
+    Subject,
 } = require('../models');
+const { tenantWhere } = require('../utils/tenantScope');
+
+// Assessment não tem schoolId próprio (ver docs/project-rules.md, seção 5) —
+// o isolamento por escola é feito via join obrigatório em
+// CourseOfferingSubject -> Subject.
+function courseOfferingSubjectScope(req) {
+    return {
+        model: CourseOfferingSubject,
+        as: "courseOfferingSubject",
+        required: true,
+        include: [{ model: Subject, as: "subject", required: true, where: tenantWhere(req) }],
+    };
+}
 
 async function createAssessment(req, res) {
     try {
@@ -15,13 +29,13 @@ async function createAssessment(req, res) {
             description
         } = req.body;
 
-        const subject =
-            await CourseOfferingSubject.findByPk(
-                courseOfferingSubjectId
-            );
+        const courseOfferingSubject = await CourseOfferingSubject.findOne({
+            where: { id: courseOfferingSubjectId },
+            include: [{ model: Subject, as: "subject", required: true, where: tenantWhere(req) }],
+        });
 
-        if (!subject) {
-            return res.status(404).json({ message: "Course offering subject not found" });
+        if (!courseOfferingSubject) {
+            return res.status(404).json({ message: "Course offering subject not found in this school" });
         }
 
         const totalWeight =
@@ -59,21 +73,21 @@ async function createAssessment(req, res) {
         console.error(error);
 
         return res.status(500).json({
-            message: error.message,
+            message: "An error occurred while creating the assessment.",
         });
     }
 }
 
 async function getAssessments(req, res) {
     try {
+        const { courseOfferingSubjectId } = req.query;
+        const where = {};
+        if (courseOfferingSubjectId) where.courseOfferingSubjectId = courseOfferingSubjectId;
+
         const assessments =
             await Assessment.findAll({
-                include: [
-                    {
-                        association:
-                            "courseOfferingSubject",
-                    },
-                ],
+                where,
+                include: [courseOfferingSubjectScope(req)],
             });
 
         return res.status(200).json({
@@ -81,7 +95,7 @@ async function getAssessments(req, res) {
         });
     } catch (error) {
         return res.status(500).json({
-            message: error.message,
+            message: "An error occurred while fetching assessments.",
         });
     }
 }

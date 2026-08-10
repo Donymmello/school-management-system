@@ -1,5 +1,7 @@
 const { Subject } = require("../models");
-const generateSubjectCode = require("../utils/generateSubjectCode");
+const { generateSubjectCode } = require("../utils/generateCode");
+const { tenantWhere } = require("../utils/tenantScope");
+const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
 
 async function createSubject(req, res) {
   try {
@@ -12,6 +14,10 @@ async function createSubject(req, res) {
       active,
     } = req.body;
 
+    if (!req.schoolId) {
+      return res.status(400).json({ message: "schoolId is required to create a subject." });
+    }
+
     if (!name) {
       return res.status(400).json({
         message: "Name is required.",
@@ -19,7 +25,7 @@ async function createSubject(req, res) {
     }
 
     const existingSubjectByName = await Subject.findOne({
-      where: { name },
+      where: tenantWhere(req, { name }),
     });
 
     if (existingSubjectByName) {
@@ -31,6 +37,7 @@ async function createSubject(req, res) {
     const code = await generateSubjectCode();
 
     const subject = await Subject.create({
+      schoolId: req.schoolId,
       code,
       name,
       description: description || null,
@@ -45,6 +52,7 @@ async function createSubject(req, res) {
       subject,
     });
   } catch (error) {
+    if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
     console.error("Error creating subject:", error);
 
     return res.status(500).json({
@@ -65,7 +73,7 @@ async function getAllSubjects(req, res) {
     }
 
     const subjects = await Subject.findAll({
-      where,
+      where: tenantWhere(req, where),
       order: [["name", "ASC"]],
     });
 
@@ -97,7 +105,7 @@ async function getSubjectById(req, res) {
   try {
     const { id } = req.params;
 
-    const subject = await Subject.findByPk(id);
+    const subject = await Subject.findOne({ where: tenantWhere(req, { id }) });
 
     if (!subject) {
       return res.status(404).json({
@@ -130,7 +138,7 @@ async function updateSubject(req, res) {
       active,
     } = req.body;
 
-    const subject = await Subject.findByPk(id);
+    const subject = await Subject.findOne({ where: tenantWhere(req, { id }) });
 
     if (!subject) {
       return res.status(404).json({
@@ -140,7 +148,7 @@ async function updateSubject(req, res) {
 
     if (code && code !== subject.code) {
       const existingSubjectByCode = await Subject.findOne({
-        where: { code },
+        where: tenantWhere(req, { code }),
       });
 
       if (existingSubjectByCode) {
@@ -152,7 +160,7 @@ async function updateSubject(req, res) {
 
     if (name && name !== subject.name) {
       const existingSubjectByName = await Subject.findOne({
-        where: { name },
+        where: tenantWhere(req, { name }),
       });
 
       if (existingSubjectByName) {
@@ -177,6 +185,7 @@ async function updateSubject(req, res) {
       subject,
     });
   } catch (error) {
+    if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
     console.error("Error updating subject:", error);
 
     return res.status(500).json({
@@ -190,7 +199,7 @@ async function deactivateSubject(req, res) {
   try {
     const { id } = req.params;
 
-    const subject = await Subject.findByPk(id);
+    const subject = await Subject.findOne({ where: tenantWhere(req, { id }) });
 
     if (!subject) {
       return res.status(404).json({
@@ -220,7 +229,7 @@ async function deleteSubject(req, res) {
   try {
     const { id } = req.params;
 
-    const subject = await Subject.findByPk(id);
+    const subject = await Subject.findOne({ where: tenantWhere(req, { id }) });
 
     if (!subject) {
       return res.status(404).json({

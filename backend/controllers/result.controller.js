@@ -8,21 +8,21 @@ async function getStudentResult(req, res) {
     try {
         const {
             enrollmentId,
-            courseOfferingStudentId,
+            courseOfferingSubjectId,
         } = req.params;
 
-        const result =
-            await calculateStudentResult(
-                enrollmentId,
-                courseOfferingStudentId
-            );
+        const result = await calculateStudentResult(req, {
+            enrollmentId,
+            courseOfferingSubjectId,
+        });
 
-            return res.status(200).json(
-                result
-            );
+        return res.status(200).json(result);
     } catch (error) {
-        return res.status(500).json({
-            message: error.message,
+        const status = error.status || 500;
+        return res.status(status).json({
+            message: status === 500
+                ? "An error occurred while calculating the result."
+                : error.message,
         });
     }
 }

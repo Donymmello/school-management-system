@@ -16,6 +16,7 @@ const Course = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
       field: "school_id",
+      unique: "course_school_name_faculty",
     },
 
     name: {
@@ -33,6 +34,7 @@ const Course = sequelize.define(
         "OTHER"
       ),
       allowNull: false,
+      unique: "course_school_name_faculty",
     },
 
     displayName: {
@@ -50,6 +52,7 @@ const Course = sequelize.define(
         "OTHER"
       ),
       allowNull: false,
+      unique: "course_school_name_faculty",
     },
 
     durationYears: {

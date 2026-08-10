@@ -1,6 +1,8 @@
 const { Op } = require("sequelize");
 const { Student, User } = require("../models");
 const registerLogAudit = require("../utils/logAudit");
+const { tenantWhere } = require("../utils/tenantScope");
+const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
 
 async function validateStudentData({ idNumber, userId, studentId = null }) {
   if (idNumber) {
@@ -31,6 +33,8 @@ async function validateStudentData({ idNumber, userId, studentId = null }) {
 }
 
 function errorTreatment(res, error, standardMessage) {
+  if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
+
   const map = {
     "A student with this ID number already exists.": { status: 400, message: error.message },
     "The user linked to this student was not found.": { status: 404, message: error.message },
@@ -52,6 +56,7 @@ function errorTreatment(res, error, standardMessage) {
 async function getAllStudents(req, res) {
   try {
     const students = await Student.findAll({
+      where: tenantWhere(req),
       include: [{ model: User, as: "user", required: false, attributes: ["id", "name", "email", "role", "active"] }],
       order: [["id", "DESC"]],
     });
@@ -66,7 +71,8 @@ async function getAllStudents(req, res) {
 // Buscar estudante por ID
 async function getStudentById(req, res) {
   try {
-    const student = await Student.findByPk(req.params.id, {
+    const student = await Student.findOne({
+      where: tenantWhere(req, { id: req.params.id }),
       include: [{ model: User, as: "user", required: false, attributes: ["id", "name", "email", "role", "active"] }],
     });
 
@@ -82,9 +88,9 @@ async function getStudentById(req, res) {
 async function updateStudent(req, res) {
   try {
     const { id } = req.params;
-    const student = await Student.findByPk(id);
+    const student = await Student.findOne({ where: tenantWhere(req, { id }) });
     if (!student) return res.status(404).json({ message: "Student not found." });
-    
+
 
     const {
       name,
@@ -133,8 +139,8 @@ async function updateStudent(req, res) {
 // Apagar estudante
 async function deleteStudent(req, res) {
   try {
-    
-    const student = await Student.findByPk(req.params.id);
+
+    const student = await Student.findOne({ where: tenantWhere(req, { id: req.params.id }) });
     if (!student) return res.status(404).json({ message: "Student not found." });
     
     await student.destroy();

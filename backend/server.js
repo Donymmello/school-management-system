@@ -6,9 +6,10 @@ require("dotenv").config();
 
 
 const authRoutes = require('./routes/auth.routes');
+const schoolRoutes = require('./routes/schools.routes');
 const studentRoutes = require('./routes/students.routes');
-//const teacherRoutes = require('./routes/teachers');
-/////const staffRoutes = require('./routes/staff');
+const teacherRoutes = require('./routes/teachers.routes');
+const staffRoutes = require('./routes/staff.routes');
 const logAuditRoutes = require('./routes/logAudit.routes');
 const subjectRoutes = require('./routes/subjects.routes');
 const classroomRoutes = require('./routes/classrooms.routes');
@@ -20,8 +21,9 @@ const scheduleRoutes = require('./routes/schedules.routes');
 const studentAssessmentRoutes = require('./routes/studentAssessments.routes');
 const assessmentRoutes = require('./routes/assessments.routes');
 const resultRoutes = require('./routes/results.routes');
-///const gradeRoutes = require('./routes/grades');
-//const attendanceRoutes = require('./routes/attendance');
+const gradeRoutes = require('./routes/grades.routes');
+const attendanceRoutes = require('./routes/attendance.routes');
+const academicPolicyRoutes = require('./routes/academicPolicies.routes');
 //const emailRoutes = require('./routes/emails');
 
 const app = express();
@@ -31,6 +33,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
+app.use('/api/schools', schoolRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/logs-audit', logAuditRoutes);
 app.use('/api/subjects', subjectRoutes);
@@ -43,10 +46,11 @@ app.use('/api/schedules', scheduleRoutes);
 app.use('/api/assessments', assessmentRoutes);
 app.use('/api/student-assessments', studentAssessmentRoutes);
 app.use('/api/results', resultRoutes);
-////app.use('/api/teachers', teacherRoutes);
-//app.use('/api/staff', staffRoutes);
-//app.use('/api/grades', gradeRoutes);
-///app.use('/api/attendance', attendanceRoutes);
+app.use('/api/teachers', teacherRoutes);
+app.use('/api/staff', staffRoutes);
+app.use('/api/grades', gradeRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/academic-policies', academicPolicyRoutes);
 //app.use('/api/emails', emailRoutes);
 
 async function startServer() {

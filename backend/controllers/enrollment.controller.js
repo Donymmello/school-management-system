@@ -1,4 +1,27 @@
 const { Enrollment, CourseOffering, Student, Course } = require('../models');
+const { tenantWhere } = require('../utils/tenantScope');
+const { isUniqueConstraintError, respondUniqueConstraint } = require('../utils/dbErrors');
+
+// Enrollment não tem schoolId próprio (ver docs/project-rules.md, seção 5) —
+// o isolamento por escola é feito via join obrigatório no Student dono da
+// matrícula.
+function studentScope(req, extra = {}) {
+    return {
+        model: Student,
+        as: "student",
+        required: true,
+        where: tenantWhere(req, extra),
+    };
+}
+
+function courseOfferingScope(req) {
+    return {
+        model: CourseOffering,
+        as: "courseOffering",
+        required: true,
+        include: [{ model: Course, as: "course", required: true, where: tenantWhere(req) }],
+    };
+}
 
 async function enrollStudent(req, res) {
     try {
@@ -10,33 +33,22 @@ async function enrollStudent(req, res) {
             });
         }
 
-        const student = await Student.findByPk(studentId);
+        const student = await Student.findOne({ where: tenantWhere(req, { id: studentId }) });
 
         if (!student) {
             return res.status(404).json({
-                message: "Student not found.",
+                message: "Student not found in this school.",
             });
         }
 
-        const courseOffering = await CourseOffering.findByPk(courseOfferingId);
+        const courseOffering = await CourseOffering.findOne({
+            where: { id: courseOfferingId },
+            include: [{ model: Course, as: "course", required: true, where: tenantWhere(req) }],
+        });
 
         if (!courseOffering) {
             return res.status(404).json({
-                message: "Course offering not found.",
-            });
-        }
-
-        const existingEnrollment = await Enrollment.findOne({
-
-            where: { 
-                studentId, 
-                courseOfferingId 
-            },
-        });
-
-        if (existingEnrollment) {
-            return res.status(409).json({
-                message: "Student is already enrolled in this course offering.",
+                message: "Course offering not found in this school.",
             });
         }
 
@@ -51,11 +63,13 @@ async function enrollStudent(req, res) {
             enrollment,
         });
     } catch (error) {
+        if (isUniqueConstraintError(error)) {
+            return res.status(409).json({ message: "Student is already enrolled in this course offering." });
+        }
         console.error("Error enrolling student:", error);
 
         return res.status(500).json({
             message: "An error occurred while enrolling the student.",
-            error: error.message,
         });
     }
 }
@@ -72,22 +86,7 @@ async function getEnrollments(req, res) {
 
         const enrollments = await Enrollment.findAll({
             where,
-            include: [
-                {
-                    model: Student,
-                    as: "student",
-                },
-                {
-                    model: CourseOffering,
-                    as: "courseOffering",
-                    include: [
-                        {
-                            model: Course,
-                            as: "course",
-                        },
-                    ],
-                },
-            ],
+            include: [studentScope(req), courseOfferingScope(req)],
             order: [["created_at", "DESC"]],
         });
 
@@ -97,7 +96,6 @@ async function getEnrollments(req, res) {
 
         return res.status(500).json({
             message: "An error occurred while fetching enrollments.",
-            error: error.message,
         });
     }
 }
@@ -106,23 +104,9 @@ async function getEnrollmentById(req, res) {
     try {
         const { id } = req.params;
 
-        const enrollment = await Enrollment.findByPk(id, {
-            include: [
-                {
-                    model: Student,
-                    as: "student",
-                },
-                {
-                    model: CourseOffering,
-                    as: "courseOffering",
-                    include: [
-                        {
-                            model: Course,
-                            as: "course",
-                        },
-                    ],
-                },
-            ],
+        const enrollment = await Enrollment.findOne({
+            where: { id },
+            include: [studentScope(req), courseOfferingScope(req)],
         });
 
         if (!enrollment) {
@@ -137,7 +121,6 @@ async function getEnrollmentById(req, res) {
 
         return res.status(500).json({
             message: "An error occurred while fetching the enrollment.",
-            error: error.message,
         });
     }
 }
@@ -146,7 +129,10 @@ async function approveEnrollment(req, res) {
     try {
         const { id } = req.params;
 
-        const enrollment = await Enrollment.findByPk(id);
+        const enrollment = await Enrollment.findOne({
+            where: { id },
+            include: [studentScope(req)],
+        });
 
         if (!enrollment) {
             return res.status(404).json({
@@ -176,7 +162,6 @@ async function approveEnrollment(req, res) {
 
         return res.status(500).json({
             message: "An error occurred while approving the enrollment.",
-            error: error.message,
         });
     }
 }
@@ -186,7 +171,10 @@ async function rejectEnrollment(req, res) {
         const { id } = req.params;
         const { rejectionReason } = req.body;
 
-        const enrollment = await Enrollment.findByPk(id);
+        const enrollment = await Enrollment.findOne({
+            where: { id },
+            include: [studentScope(req)],
+        });
 
         if (!enrollment) {
             return res.status(404).json({
@@ -216,7 +204,6 @@ async function rejectEnrollment(req, res) {
 
         return res.status(500).json({
             message: "An error occurred while rejecting the enrollment.",
-            error: error.message,
         });
     }
 }
@@ -225,7 +212,10 @@ async function cancelEnrollment(req, res) {
     try {
         const { id } = req.params;
 
-        const enrollment = await Enrollment.findByPk(id);
+        const enrollment = await Enrollment.findOne({
+            where: { id },
+            include: [studentScope(req)],
+        });
 
         if (!enrollment) {
             return res.status(404).json({
@@ -252,7 +242,6 @@ async function cancelEnrollment(req, res) {
 
         return res.status(500).json({
             message: "An error occurred while cancelling the enrollment.",
-            error: error.message,
         });
     }
 }

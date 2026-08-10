@@ -1,9 +1,19 @@
 const {
     CourseOfferingSubject,
     CourseOffering,
+    Course,
     Subject,
     Teacher,
 } = require('../models');
+const { tenantWhere } = require('../utils/tenantScope');
+const { isUniqueConstraintError, respondUniqueConstraint } = require('../utils/dbErrors');
+
+// CourseOfferingSubject não tem schoolId próprio (ver docs/project-rules.md,
+// seção 5) — o isolamento por escola é feito via join obrigatório no
+// Subject (subjectId nunca é nulo).
+function subjectScope(req) {
+    return { model: Subject, as: "subject", required: true, where: tenantWhere(req) };
+}
 
 async function createCourseOfferingSubject(req, res) {
     try {
@@ -16,33 +26,30 @@ async function createCourseOfferingSubject(req, res) {
             endDate,
         } = req.body;
 
-        const offering = await CourseOffering.findByPk(courseOfferingId);
-        
-        if (!offering) {
-            return res.status(404).json({
-              message: "Course offering not found",
-            });
-        }
-
-        const subject = await Subject.findByPk(subjectId);
-        
-        if (!subject) {
-            return res.status(404).json({
-              message: "Subject not found",
-            });
-        }
-
-        const exists = await CourseOfferingSubject.findOne({
-            where: {
-                courseOfferingId,
-                subjectId,
-            },
+        const offering = await CourseOffering.findOne({
+            where: { id: courseOfferingId },
+            include: [{ model: Course, as: "course", required: true, where: tenantWhere(req) }],
         });
 
-        if (exists) {
-            return res.status(400).json({
-              message: "This subject is already assigned to the course offering",
+        if (!offering) {
+            return res.status(404).json({
+              message: "Course offering not found in this school",
             });
+        }
+
+        const subject = await Subject.findOne({ where: tenantWhere(req, { id: subjectId }) });
+
+        if (!subject) {
+            return res.status(404).json({
+              message: "Subject not found in this school",
+            });
+        }
+
+        if (teacherId) {
+            const teacher = await Teacher.findOne({ where: tenantWhere(req, { id: teacherId }) });
+            if (!teacher) {
+                return res.status(404).json({ message: "Teacher not found in this school" });
+            }
         }
 
         const item = await CourseOfferingSubject.create({
@@ -59,10 +66,11 @@ async function createCourseOfferingSubject(req, res) {
             data: item,
         });
     } catch (error) {
+        if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
         console.error(error);
 
         return res.status(500).json({
-            message: error.message,
+            message: "An error occurred while assigning the subject to the course offering.",
         });
     }
 }
@@ -75,48 +83,40 @@ async function getAllCourseOfferingSubjects(req, res) {
                     model: CourseOffering,
                     as: "courseOffering",
                 },
-                {
-                    model: Subject,
-                    as: "subject",
-                },
+                subjectScope(req),
                 {
                     model: Teacher,
                     as: "teacher",
                 },
-                
+
             ],
         });
 
         return res.status(200).json(data);
     } catch (error) {
         return res.status(500).json({
-            message: error.message,
+            message: "An error occurred while fetching course offering subjects.",
         });
     }
 }
 
 async function getCourseOfferingSubjectById(req, res) {
     try {
-        const item = await CourseOfferingSubject.findByPk(
-            req.params.id,
-            {
-                include: [
-                    {
-                        model: CourseOffering,
-                        as: "courseOffering",
-                    },
-                    {
-                        model: Subject,
-                        as: "subject",
-                    },
-                    {
-                        model: Teacher,
-                        as: "teacher",
-                    },
-                    
-                ],
-            }
-        );
+        const item = await CourseOfferingSubject.findOne({
+            where: { id: req.params.id },
+            include: [
+                {
+                    model: CourseOffering,
+                    as: "courseOffering",
+                },
+                subjectScope(req),
+                {
+                    model: Teacher,
+                    as: "teacher",
+                },
+
+            ],
+        });
 
         if (!item) {
             return res.status(404).json({
@@ -127,7 +127,7 @@ async function getCourseOfferingSubjectById(req, res) {
         return res.status(200).json(item);
     } catch (error) {
         return res.status(500).json({
-            message: error.message,
+            message: "An error occurred while fetching the course offering subject.",
         });
     }
 }
@@ -137,7 +137,10 @@ async function updateCourseOfferingSubject(req, res) {
         const { id } = req.params;
         const { teacherId, weeklyHours, startDate, endDate, status } = req.body;
 
-        const item = await CourseOfferingSubject.findByPk(id);
+        const item = await CourseOfferingSubject.findOne({
+            where: { id },
+            include: [subjectScope(req)],
+        });
 
         if (!item) {
             return res.status(404).json({
@@ -145,12 +148,19 @@ async function updateCourseOfferingSubject(req, res) {
             });
         }
 
+        if (teacherId) {
+            const teacher = await Teacher.findOne({ where: tenantWhere(req, { id: teacherId }) });
+            if (!teacher) {
+                return res.status(404).json({ message: "Teacher not found in this school" });
+            }
+        }
+
         await item.update({
-            teacherId,
-            weeklyHours,
-            startDate,
-            endDate,
-            status,
+            teacherId: teacherId ?? item.teacherId,
+            weeklyHours: weeklyHours ?? item.weeklyHours,
+            startDate: startDate ?? item.startDate,
+            endDate: endDate ?? item.endDate,
+            status: status ?? item.status,
         });
 
         return res.status(200).json({
@@ -158,8 +168,9 @@ async function updateCourseOfferingSubject(req, res) {
             data: item,
         });
     } catch (error) {
+        if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
         return res.status(500).json({
-            message: error.message,
+            message: "An error occurred while updating the course offering subject.",
         });
     }
 }

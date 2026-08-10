@@ -2,9 +2,24 @@ const {
     Schedule,
     CourseOfferingSubject,
     Classroom,
+    Subject,
 } = require('../models');
 
 const { Op } = require('sequelize');
+const { tenantWhere } = require('../utils/tenantScope');
+
+// Schedule não tem schoolId próprio (ver docs/project-rules.md, seção 5) — o
+// isolamento por escola é feito via join obrigatório em
+// CourseOfferingSubject -> Subject (subjectId nunca é nulo; classroomId é
+// opcional, por isso não dá pra confiar só nele).
+function courseOfferingSubjectScope(req) {
+    return {
+        model: CourseOfferingSubject,
+        as: "courseOfferingSubject",
+        required: true,
+        include: [{ model: Subject, as: "subject", required: true, where: tenantWhere(req) }],
+    };
+}
 
 async function createSchedule(req, res) {
     try {
@@ -34,23 +49,22 @@ async function createSchedule(req, res) {
             });
         }
 
-        const courseOfferingSubject =
-            await CourseOfferingSubject.findByPk(
-                courseOfferingSubjectId
-            );
+        const courseOfferingSubject = await CourseOfferingSubject.findOne({
+            where: { id: courseOfferingSubjectId },
+            include: [{ model: Subject, as: "subject", required: true, where: tenantWhere(req) }],
+        });
 
         if (!courseOfferingSubject) {
             return res.status(404).json({
-                message: "Course offering subject not found",
+                message: "Course offering subject not found in this school",
             });
         }
 
-        const classroom =
-            await Classroom.findByPk(classroomId);
+        const classroom = await Classroom.findOne({ where: tenantWhere(req, { id: classroomId }) });
 
         if (!classroom) {
             return res.status(404).json({
-                message: "Classroom not found",
+                message: "Classroom not found in this school",
             });
         }
 
@@ -74,7 +88,7 @@ async function createSchedule(req, res) {
             });
         }
 
-        const shedule = await Schedule.create({
+        const schedule = await Schedule.create({
             courseOfferingSubjectId,
             classroomId,
             dayOfWeek,
@@ -84,7 +98,7 @@ async function createSchedule(req, res) {
 
         return res.status(201).json({
             message: "Schedule created successfully",
-            shedule,
+            schedule,
         });
     } catch (error) {
         console.error(
@@ -95,7 +109,6 @@ async function createSchedule(req, res) {
         return res.status(500).json({
             message:
                 "An error occurred while creating the schedule.",
-            error: error.message,
         });
     }
 }
@@ -104,13 +117,8 @@ async function getAllSchedules(req, res) {
     try {
         const schedules = await Schedule.findAll({
             include: [
-                {
-                    association:
-                        "courseOfferingSubject",
-                },
-                {
-                    association: "classroom",
-                },
+                courseOfferingSubjectScope(req),
+                { association: "classroom" },
             ],
         });
 
@@ -119,29 +127,20 @@ async function getAllSchedules(req, res) {
         );
     } catch (error) {
         return res.status(500).json({
-            message: error.message,
+            message: "An error occurred while fetching schedules.",
         });
-    }   
+    }
 }
 
 async function getScheduleById(req, res) {
     try {
-        const schedule =
-            await Schedule.findByPk(
-                req.params.id,
-                {
-                    include: [
-                        {
-                            association:
-                                "courseOfferingSubject",
-                        },
-                        {
-                            association: 
-                            "classroom",
-                        },
-                    ],
-                }
-            );
+        const schedule = await Schedule.findOne({
+            where: { id: req.params.id },
+            include: [
+                courseOfferingSubjectScope(req),
+                { association: "classroom" },
+            ],
+        });
 
         if (!schedule) {
             return res.status(404).json({
@@ -154,17 +153,17 @@ async function getScheduleById(req, res) {
         );
     } catch (error) {
         return res.status(500).json({
-            message: error.message,
+            message: "An error occurred while fetching the schedule.",
         });
     }
 }
 
 async function updateSchedule(req, res) {
     try {
-        const schedule =
-            await Schedule.findByPk(
-                req.params.id
-            );
+        const schedule = await Schedule.findOne({
+            where: { id: req.params.id },
+            include: [courseOfferingSubjectScope(req)],
+        });
 
         if (!schedule) {
             return res.status(404).json({
@@ -172,7 +171,22 @@ async function updateSchedule(req, res) {
             });
         }
 
-        await schedule.update(req.body);
+        const { classroomId, dayOfWeek, startTime, endTime, status } = req.body;
+
+        if (classroomId) {
+            const classroom = await Classroom.findOne({ where: tenantWhere(req, { id: classroomId }) });
+            if (!classroom) {
+                return res.status(404).json({ message: "Classroom not found in this school" });
+            }
+        }
+
+        await schedule.update({
+            classroomId: classroomId ?? schedule.classroomId,
+            dayOfWeek: dayOfWeek ?? schedule.dayOfWeek,
+            startTime: startTime ?? schedule.startTime,
+            endTime: endTime ?? schedule.endTime,
+            status: status ?? schedule.status,
+        });
 
         return res.status(200).json({
             message: "Schedule updated successfully",
@@ -180,18 +194,18 @@ async function updateSchedule(req, res) {
         });
     } catch (error) {
         return res.status(500).json({
-            message: error.message,
+            message: "An error occurred while updating the schedule.",
         });
     }
 }
 
 async function deleteSchedule(req, res) {
     try {
-        const schedule =
-            await Schedule.findByPk(
-                req.params.id
-            );
-            
+        const schedule = await Schedule.findOne({
+            where: { id: req.params.id },
+            include: [courseOfferingSubjectScope(req)],
+        });
+
         if (!schedule) {
             return res.status(404).json({
                 message: "Schedule not found",
@@ -206,7 +220,7 @@ async function deleteSchedule(req, res) {
         });
     } catch (error) {
         return res.status(500).json({
-            message: error.message,
+            message: "An error occurred while deleting the schedule.",
         });
     }
 }

@@ -1,5 +1,20 @@
 const { Course, CourseOffering } = require("../models");
 const generateCourseOfferingCode = require("../utils/generateCourseOfferingCode");
+const { tenantWhere } = require("../utils/tenantScope");
+const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
+
+// CourseOffering não tem schoolId próprio (ver docs/project-rules.md, seção 5)
+// — o isolamento por escola é feito via join obrigatório no Course dono da
+// oferta. `courseScope` também serve pra confirmar que o courseId informado
+// pertence à escola de quem está fazendo a chamada.
+function courseScope(req, extra = {}) {
+  return {
+    model: Course,
+    as: "course",
+    required: true,
+    where: tenantWhere(req, extra),
+  };
+}
 
 async function createCourseOffering(req, res) {
   try {
@@ -17,11 +32,11 @@ async function createCourseOffering(req, res) {
       });
     }
 
-    const course = await Course.findByPk(courseId);
+    const course = await Course.findOne({ where: tenantWhere(req, { id: courseId }) });
 
     if (!course) {
       return res.status(404).json({
-        message: "Course not found.",
+        message: "Course not found in this school.",
       });
     }
 
@@ -30,15 +45,6 @@ async function createCourseOffering(req, res) {
       academicYear,
       semester,
     });
-
-    const existingOffering = await CourseOffering.findOne({ where: { code } });
-
-    if (existingOffering) {
-      return res.status(409).json({
-        message: "This course offering already exists.",
-        code,
-      });
-    }
 
     const offering = await CourseOffering.create({
       code,
@@ -54,11 +60,11 @@ async function createCourseOffering(req, res) {
       offering,
     });
   } catch (error) {
+    if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
     console.error("Error creating course offering:", error);
 
     return res.status(500).json({
       message: "An error occurred while creating the course offering.",
-      error: error.message,
     });
   }
 }
@@ -76,7 +82,7 @@ async function getAllCourseOfferings(req, res) {
 
     const offerings = await CourseOffering.findAll({
       where,
-      include: [{ model: Course, as: "course" }],
+      include: [courseScope(req)],
       order: [
         ["academicYear", "DESC"],
         ["semester", "ASC"],
@@ -86,17 +92,18 @@ async function getAllCourseOfferings(req, res) {
 
     return res.status(200).json(offerings);
   } catch (error) {
+    console.error("Error fetching course offerings:", error);
     return res.status(500).json({
       message: "An error occurred while fetching course offerings.",
-      error: error.message,
     });
   }
 }
 
 async function getCourseOfferingById(req, res) {
   try {
-    const offering = await CourseOffering.findByPk(req.params.id, {
-      include: [{ model: Course, as: "course" }],
+    const offering = await CourseOffering.findOne({
+      where: { id: req.params.id },
+      include: [courseScope(req)],
     });
 
     if (!offering) {
@@ -107,9 +114,9 @@ async function getCourseOfferingById(req, res) {
 
     return res.status(200).json(offering);
   } catch (error) {
+    console.error("Error fetching course offering:", error);
     return res.status(500).json({
       message: "An error occurred while fetching the course offering.",
-      error: error.message,
     });
   }
 }
@@ -119,8 +126,9 @@ async function updateCourseOffering(req, res) {
     const { id } = req.params;
     const { academicYear, semester, capacity, active } = req.body;
 
-    const offering = await CourseOffering.findByPk(id, {
-      include: [{ model: Course, as: "course" }],
+    const offering = await CourseOffering.findOne({
+      where: { id },
+      include: [courseScope(req)],
     });
 
     if (!offering) {
@@ -144,19 +152,6 @@ async function updateCourseOffering(req, res) {
       semester: nextSemester,
     });
 
-    if (nextCode !== offering.code) {
-      const existingOffering = await CourseOffering.findOne({
-        where: { code: nextCode },
-      });
-
-      if (existingOffering) {
-        return res.status(409).json({
-          message: "This course offering already exists.",
-          code: nextCode,
-        });
-      }
-    }
-
     await offering.update({
       code: nextCode,
       academicYear: nextAcademicYear,
@@ -170,16 +165,20 @@ async function updateCourseOffering(req, res) {
       offering,
     });
   } catch (error) {
+    if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
+    console.error("Error updating course offering:", error);
     return res.status(500).json({
       message: "An error occurred while updating the course offering.",
-      error: error.message,
     });
   }
 }
 
 async function deactivateCourseOffering(req, res) {
   try {
-    const offering = await CourseOffering.findByPk(req.params.id);
+    const offering = await CourseOffering.findOne({
+      where: { id: req.params.id },
+      include: [courseScope(req)],
+    });
 
     if (!offering) {
       return res.status(404).json({
@@ -194,9 +193,9 @@ async function deactivateCourseOffering(req, res) {
       offering,
     });
   } catch (error) {
+    console.error("Error deactivating course offering:", error);
     return res.status(500).json({
       message: "An error occurred while deactivating the course offering.",
-      error: error.message,
     });
   }
 }

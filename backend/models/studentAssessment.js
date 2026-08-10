@@ -43,6 +43,9 @@ const StudentAssessment = sequelize.define(
         timestamps: true,
         createdAt: "created_at",
         updatedAt: "updated_at",
+        // Uma matrícula não pode ter duas notas para a mesma avaliação —
+        // garantia real é essa constraint (ver docs/project-rules.md, seção 0).
+        indexes: [{ unique: true, fields: ["enrollment_id", "assessment_id"] }],
     }
 );
 
