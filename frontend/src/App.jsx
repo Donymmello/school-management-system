@@ -3,6 +3,7 @@ import { Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import RequireAuth from "./routes/RequireAuth.jsx";
 import DashboardLayout from "./layouts/DashboardLayout.jsx";
+import LandingPage from "./pages/auth/LandingPage.jsx";
 import LoginPage from "./pages/auth/LoginPage.jsx";
 import RegisterSchoolPage from "./pages/auth/RegisterSchoolPage.jsx";
 import DashboardHome from "./pages/DashboardHome.jsx";
@@ -15,24 +16,31 @@ import CourseOfferingsListPage from "./pages/courseOfferings/CourseOfferingsList
 import EnrollmentsListPage from "./pages/enrollments/EnrollmentsListPage.jsx";
 import AttendanceListPage from "./pages/attendance/AttendanceListPage.jsx";
 import GradesListPage from "./pages/grades/GradesListPage.jsx";
+import FeesListPage from "./pages/fees/FeesListPage.jsx";
 import SchoolsListPage from "./pages/schools/SchoolsListPage.jsx";
 import NotFoundPage from "./pages/NotFoundPage.jsx";
 
 const STUDENTS_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR"];
 const CLASSROOMS_ROLES = ["SUPER_ADMIN", "ADMIN", "STAFF", "DIRECTOR", "TEACHER"];
-const TEACHERS_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "SECRETARY"];
-const SUBJECTS_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "SECRETARY", "TEACHER"];
+const TEACHERS_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "STAFF"];
+const SUBJECTS_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "STAFF", "TEACHER"];
 const COURSES_ROLES = ["SUPER_ADMIN", "ADMIN", "STAFF", "DIRECTOR", "TEACHER"];
 const COURSE_OFFERINGS_ROLES = ["SUPER_ADMIN", "ADMIN", "STAFF", "DIRECTOR", "TEACHER"];
-const ENROLLMENTS_ROLES = ["SUPER_ADMIN", "ADMIN", "STAFF", "DIRECTOR"];
-const ATTENDANCE_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "SECRETARY", "TEACHER"];
-const GRADES_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "SECRETARY", "TEACHER"];
+// STUDENT entra nas três: portal do aluno, somente leitura e auto-escopado
+// no backend pro próprio registro (ver docs/project-rules.md, seção 6, item 5).
+const ENROLLMENTS_ROLES = ["SUPER_ADMIN", "ADMIN", "STAFF", "DIRECTOR", "STUDENT"];
+const ATTENDANCE_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "STAFF", "TEACHER", "STUDENT"];
+const GRADES_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "TEACHER", "STAFF", "STUDENT"];
+// STAFF lança e gerencia; STUDENT só lê as próprias (portal do aluno,
+// auto-escopado no backend) — ver docs/project-rules.md, seção 6, item 5.
+const FEES_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "STAFF", "STUDENT"];
 const SCHOOLS_ROLES = ["SUPER_ADMIN"];
 
 export default function App() {
   return (
     <AuthProvider>
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/registrar-escola" element={<RegisterSchoolPage />} />
 
@@ -43,7 +51,7 @@ export default function App() {
             </RequireAuth>
           }
         >
-          <Route path="/" element={<DashboardHome />} />
+          <Route path="/painel" element={<DashboardHome />} />
           <Route
             path="/alunos"
             element={
@@ -113,6 +121,14 @@ export default function App() {
             element={
               <RequireAuth allowedRoles={GRADES_ROLES}>
                 <GradesListPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/propinas"
+            element={
+              <RequireAuth allowedRoles={FEES_ROLES}>
+                <FeesListPage />
               </RequireAuth>
             }
           />

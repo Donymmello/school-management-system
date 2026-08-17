@@ -1,6 +1,7 @@
 const { Enrollment, CourseOffering, Student, Course } = require('../models');
 const { tenantWhere } = require('../utils/tenantScope');
 const { isUniqueConstraintError, respondUniqueConstraint } = require('../utils/dbErrors');
+const { resolveOwnStudentId } = require('../utils/selfScope');
 
 // Enrollment não tem schoolId próprio (ver docs/project-rules.md, seção 5) —
 // o isolamento por escola é feito via join obrigatório no Student dono da
@@ -80,7 +81,16 @@ async function getEnrollments(req, res) {
 
         const where = {};
 
-        if (studentId) where.studentId = studentId;
+        // Portal do aluno: ignora studentId da query e força o próprio
+        // registro (ver docs/project-rules.md, seção 6, item 5).
+        if (req.user.role === "STUDENT") {
+            const ownStudentId = await resolveOwnStudentId(req);
+            if (!ownStudentId) return res.status(403).json({ message: "Student profile not found for this user." });
+            where.studentId = ownStudentId;
+        } else if (studentId) {
+            where.studentId = studentId;
+        }
+
         if (courseOfferingId) where.courseOfferingId = courseOfferingId;
         if (status) where.status = status;
 
@@ -113,6 +123,16 @@ async function getEnrollmentById(req, res) {
             return res.status(404).json({
                 message: "Enrollment not found.",
             });
+        }
+
+        // Portal do aluno: rota já permite STUDENT (histórico, ver
+        // enrollment.routes.js), mas sem isso um aluno poderia ler a
+        // matrícula de outro só adivinhando o :id.
+        if (req.user.role === "STUDENT") {
+            const ownStudentId = await resolveOwnStudentId(req);
+            if (!ownStudentId || enrollment.studentId !== ownStudentId) {
+                return res.status(404).json({ message: "Enrollment not found." });
+            }
         }
 
         return res.status(200).json(enrollment);

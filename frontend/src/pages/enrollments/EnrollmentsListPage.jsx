@@ -156,7 +156,7 @@ export default function EnrollmentsListPage() {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} gap={2}>
         <Typography variant="h4" component="h1">
-          Matrículas
+          {user?.role === "STUDENT" ? "Minhas matrículas" : "Matrículas"}
         </Typography>
         {canManage && (
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => setFormOpen(true)}>

@@ -68,6 +68,24 @@ async function getAllStudents(req, res) {
   }
 }
 
+// Portal do aluno: o próprio registro, resolvido pelo userId do token — não
+// pelo :id da URL, senão um aluno poderia trocar o parâmetro e ver outro
+// (ver docs/project-rules.md, seção 6, item 5).
+async function getMyProfile(req, res) {
+  try {
+    const student = await Student.findOne({
+      where: { userId: req.user.id },
+      include: [{ model: User, as: "user", required: false, attributes: ["id", "name", "email", "role", "active"] }],
+    });
+
+    if (!student) return res.status(404).json({ message: "Student profile not found for this user." });
+    return res.status(200).json(student);
+  } catch (error) {
+    console.error("[Error fetching own student profile]:", error);
+    return res.status(500).json({ message: "An error occurred while fetching your profile." });
+  }
+}
+
 // Buscar estudante por ID
 async function getStudentById(req, res) {
   try {
@@ -163,6 +181,7 @@ async function deleteStudent(req, res) {
 module.exports = {
   getAllStudents,
   getStudentById,
+  getMyProfile,
   updateStudent,
   deleteStudent,
 };

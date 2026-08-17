@@ -25,10 +25,15 @@ import ConfirmDialog from "../../components/ConfirmDialog.jsx";
 import GradeFormDialog from "./GradeFormDialog.jsx";
 
 const DELETE_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR"];
+const READ_ONLY_ROLES = ["STUDENT"];
 
 export default function GradesListPage() {
   const { user } = useAuth();
   const canDelete = DELETE_ROLES.includes(user?.role);
+  // Portal do aluno: STUDENT só lê as próprias notas (auto-escopado no
+  // backend) — sem criar/editar/excluir (ver docs/project-rules.md, seção 6,
+  // item 5).
+  const readOnly = READ_ONLY_ROLES.includes(user?.role);
 
   const [grades, setGrades] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -88,11 +93,13 @@ export default function GradesListPage() {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} gap={2}>
         <Typography variant="h4" component="h1">
-          Notas
+          {readOnly ? "Minhas notas" : "Notas"}
         </Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
-          Lançar nota
-        </Button>
+        {!readOnly && (
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
+            Lançar nota
+          </Button>
+        )}
       </Box>
 
       {error && (
@@ -110,14 +117,14 @@ export default function GradesListPage() {
               <TableCell>Professor</TableCell>
               <TableCell>Período</TableCell>
               <TableCell>Nota</TableCell>
-              <TableCell align="right">Ações</TableCell>
+              {!readOnly && <TableCell align="right">Ações</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
             {loading &&
               Array.from({ length: 4 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 6 }).map((__, j) => (
+                  {Array.from({ length: readOnly ? 5 : 6 }).map((__, j) => (
                     <TableCell key={j}>
                       <Skeleton />
                     </TableCell>
@@ -127,15 +134,17 @@ export default function GradesListPage() {
 
             {!loading && grades.length === 0 && !error && (
               <TableRow>
-                <TableCell colSpan={6}>
+                <TableCell colSpan={readOnly ? 5 : 6}>
                   <Box textAlign="center" py={6} role="status">
                     <GradeOutlinedIcon sx={{ fontSize: 40, color: "text.disabled" }} />
                     <Typography variant="subtitle1" sx={{ mt: 1 }}>
                       Nenhuma nota lançada
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Clique em "Lançar nota" para começar.
-                    </Typography>
+                    {!readOnly && (
+                      <Typography variant="body2" color="text.secondary">
+                        Clique em "Lançar nota" para começar.
+                      </Typography>
+                    )}
                   </Box>
                 </TableCell>
               </TableRow>
@@ -149,24 +158,26 @@ export default function GradesListPage() {
                   <TableCell>{grade.teacher?.name || "—"}</TableCell>
                   <TableCell>{grade.term}</TableCell>
                   <TableCell>{grade.score}</TableCell>
-                  <TableCell align="right">
-                    <IconButton
-                      aria-label={`Editar nota de ${grade.student?.name}`}
-                      onClick={() => openEdit(grade)}
-                      size="small"
-                    >
-                      <EditOutlinedIcon fontSize="small" />
-                    </IconButton>
-                    {canDelete && (
+                  {!readOnly && (
+                    <TableCell align="right">
                       <IconButton
-                        aria-label={`Excluir nota de ${grade.student?.name}`}
-                        onClick={() => setDeletingGrade(grade)}
+                        aria-label={`Editar nota de ${grade.student?.name}`}
+                        onClick={() => openEdit(grade)}
                         size="small"
                       >
-                        <DeleteOutlineIcon fontSize="small" />
+                        <EditOutlinedIcon fontSize="small" />
                       </IconButton>
-                    )}
-                  </TableCell>
+                      {canDelete && (
+                        <IconButton
+                          aria-label={`Excluir nota de ${grade.student?.name}`}
+                          onClick={() => setDeletingGrade(grade)}
+                          size="small"
+                        >
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
           </TableBody>

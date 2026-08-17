@@ -13,10 +13,14 @@ const {
   deleteAttendance,
 } = require("../controllers/attendance.controller");
 
-const MANAGE_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "SECRETARY", "TEACHER"];
+const MANAGE_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "STAFF", "TEACHER"];
+// STUDENT só entra na listagem (portal do aluno, auto-escopado no
+// controller) — não em criar/editar/excluir nem em getAttendanceById, que
+// não tem esse auto-escopo implementado.
+const READ_ROLES = [...MANAGE_ROLES, "STUDENT"];
 
 router.post("/", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, createAttendance);
-router.get("/", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, getAllAttendance);
+router.get("/", authMiddleware, authorizeRoles(...READ_ROLES), requireSchool, getAllAttendance);
 router.get("/:id", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, getAttendanceById);
 router.patch("/:id", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, updateAttendance);
 router.delete(

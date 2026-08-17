@@ -25,7 +25,7 @@ export default function RequireAuth({ allowedRoles, requiredAcademicModel, child
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/painel" replace />;
   }
 
   if (
@@ -33,7 +33,7 @@ export default function RequireAuth({ allowedRoles, requiredAcademicModel, child
     user.role !== "SUPER_ADMIN" &&
     user.school?.academicModel !== requiredAcademicModel
   ) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/painel" replace />;
   }
 
   return children;

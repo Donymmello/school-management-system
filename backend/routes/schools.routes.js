@@ -23,7 +23,7 @@ router.get("/", authMiddleware, authorizeRoles("SUPER_ADMIN"), getAllSchools);
 router.get(
   "/:id",
   authMiddleware,
-  authorizeRoles("SUPER_ADMIN", "ADMIN", "DIRECTOR", "SECRETARY"),
+  authorizeRoles("SUPER_ADMIN", "ADMIN", "DIRECTOR", "STAFF"),
   getSchoolById
 );
 router.patch("/:id", authMiddleware, authorizeRoles("SUPER_ADMIN"), updateSchool);

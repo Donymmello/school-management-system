@@ -29,6 +29,7 @@ const emptyForm = {
   plan: "FREE",
   academicModel: "",
   status: "ACTIVE",
+  currency: "AOA",
 };
 
 // school === null → modo criação. school preenchido → modo edição (slug não
@@ -52,6 +53,7 @@ export default function SchoolFormDialog({ open, school, onClose, onSaved }) {
             plan: school.plan || "FREE",
             academicModel: school.academicModel || "",
             status: school.status || "ACTIVE",
+            currency: school.currency || "AOA",
           }
         : emptyForm
     );
@@ -61,17 +63,21 @@ export default function SchoolFormDialog({ open, school, onClose, onSaved }) {
     return (event) => setForm((prev) => ({ ...prev, [field]: event.target.value }));
   }
 
+  function handleCurrencyChange(event) {
+    setForm((prev) => ({ ...prev, currency: event.target.value.toUpperCase() }));
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
       if (isEditing) {
-        const { name, address, email, plan, status } = form;
-        await updateSchool(school.id, { name, address, email, plan, status });
+        const { name, address, email, plan, status, currency } = form;
+        await updateSchool(school.id, { name, address, email, plan, status, currency });
       } else {
-        const { name, address, email, slug, plan, academicModel } = form;
-        await createSchool({ name, address, email, slug, plan, academicModel });
+        const { name, address, email, slug, plan, academicModel, currency } = form;
+        await createSchool({ name, address, email, slug, plan, academicModel, currency });
       }
       onSaved();
     } catch (err) {
@@ -171,6 +177,17 @@ export default function SchoolFormDialog({ open, school, onClose, onSaved }) {
                   </MenuItem>
                 ))}
               </TextField>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Moeda das propinas"
+                value={form.currency}
+                onChange={handleCurrencyChange}
+                fullWidth
+                required
+                inputProps={{ maxLength: 3, style: { textTransform: "uppercase" } }}
+                helperText='Código de 3 letras, ex: "AOA", "USD", "BRL"'
+              />
             </Grid>
             {isEditing && (
               <Grid item xs={12} sm={6}>

@@ -47,6 +47,16 @@ const School = sequelize.define("School", {
     type: DataTypes.ENUM("ACTIVE", "INACTIVE"),
     defaultValue: "ACTIVE"
   },
+  // Moeda usada pras propinas (Fee) dessa escola — cada Fee copia esse
+  // valor no momento da criação, então mudar isso aqui não altera
+  // lançamentos já existentes. Editável por ADMIN/SUPER_ADMIN, sem lista
+  // fixa de valores (mercado do sistema não é um único país).
+  currency: {
+    type: DataTypes.STRING(3),
+    allowNull: false,
+    defaultValue: "AOA",
+    field: "currency",
+  },
 },
 {
     tableName: "schools",

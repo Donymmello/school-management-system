@@ -2,6 +2,7 @@ const { Grade, Student, Teacher, Subject } = require("../models");
 const registerLogAudit = require("../utils/logAudit");
 const { tenantWhere } = require("../utils/tenantScope");
 const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
+const { resolveOwnStudentId } = require("../utils/selfScope");
 
 // Grade não tem schoolId próprio (ver docs/project-rules.md, seção 5) — o
 // isolamento por escola é feito via join obrigatório no Student dono do
@@ -68,11 +69,23 @@ async function createGrade(req, res) {
 
 async function getAllGrades(req, res) {
   try {
-    const { studentId, subjectId, term } = req.query;
+    const { studentId, subjectId, term, teacherId } = req.query;
     const where = {};
-    if (studentId) where.studentId = studentId;
+
+    // Portal do aluno: ignora studentId da query e força o próprio registro
+    // — sem isso um STUDENT poderia ler a nota de outro só trocando o
+    // parâmetro (ver docs/project-rules.md, seção 6, item 5).
+    if (req.user.role === "STUDENT") {
+      const ownStudentId = await resolveOwnStudentId(req);
+      if (!ownStudentId) return res.status(403).json({ message: "Student profile not found for this user." });
+      where.studentId = ownStudentId;
+    } else if (studentId) {
+      where.studentId = studentId;
+    }
+
     if (subjectId) where.subjectId = subjectId;
     if (term) where.term = term;
+    if (teacherId) where.teacherId = teacherId;
 
     const grades = await Grade.findAll({
       where,

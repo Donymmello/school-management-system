@@ -5,11 +5,17 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import { getErrorMessage } from "../../api/errors.js";
 import AuthCard from "./AuthCard.jsx";
 
+// Login único (email + senha) pra qualquer papel — sem escolher portal
+// antes. Depois de autenticar, quem decide o que a pessoa vê é o próprio
+// papel da conta: `NavDrawer`/`RequireAuth` já filtram menu e rotas por
+// role (ver docs/project-rules.md, seção 6, item 5). Decisão explícita do
+// usuário: "vai ter um botão de login que dependendo das credenciais, leva
+// para o perfil certo" — sem tela de escolha de portal.
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const nextPath = new URLSearchParams(location.search).get("next") || "/";
+  const nextPath = new URLSearchParams(location.search).get("next") || "/painel";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

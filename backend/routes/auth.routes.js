@@ -8,6 +8,7 @@ const {
   registerStudent,
   login,
   getMe,
+  changePassword,
   forgotPassword,
   resetPassword,
 } = require("../controllers/auth.controller");
@@ -30,6 +31,9 @@ router.post("/login", login);
 
 // Buscar dados do utilizador autenticado
 router.get("/me", authMiddleware, getMe);
+
+// Trocar a própria senha, logado (senha atual + nova)
+router.patch("/change-password", authMiddleware, changePassword);
 
 // Recuperação de password
 router.post("/forgot-password", forgotPassword);

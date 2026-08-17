@@ -29,7 +29,7 @@ router.post(
 router.get(
   "/",
   authMiddleware,
-  authorizeRoles("ADMIN", "SUPER_ADMIN", "TEACHER", "DIRECTOR", "SECRETARY", "STUDENT"),
+  authorizeRoles("ADMIN", "SUPER_ADMIN", "TEACHER", "DIRECTOR", "STAFF", "STUDENT"),
   requireSchool,
   requireHigherEd,
   getAssessments

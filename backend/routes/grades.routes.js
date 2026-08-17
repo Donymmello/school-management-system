@@ -13,10 +13,17 @@ const {
   deleteGrade,
 } = require("../controllers/grade.controller");
 
-const MANAGE_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "SECRETARY", "TEACHER"];
+// STAFF entra aqui porque o papel foi definido como "secretaria": lança
+// nota, trata inscrição e propina — ver docs/project-rules.md, seção 4.
+// SECRETARY foi unificado em STAFF, não entra mais separado (ver seção 7).
+const MANAGE_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "TEACHER", "STAFF"];
+// STUDENT só entra na listagem (portal do aluno, auto-escopado no
+// controller) — não em criar/editar/excluir nem em getGradeById, que não
+// tem esse auto-escopo implementado.
+const READ_ROLES = [...MANAGE_ROLES, "STUDENT"];
 
 router.post("/", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, createGrade);
-router.get("/", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, getAllGrades);
+router.get("/", authMiddleware, authorizeRoles(...READ_ROLES), requireSchool, getAllGrades);
 router.get("/:id", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, getGradeById);
 router.patch("/:id", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, updateGrade);
 router.delete(

@@ -11,7 +11,7 @@ const { getActivePolicy, updateActivePolicy } = require("../controllers/academic
 const MANAGE_ROLES = ["SUPER_ADMIN", "ADMIN"];
 const requireHigherEd = requireAcademicModel("HIGHER_ED");
 
-router.get("/active", authMiddleware, authorizeRoles(...MANAGE_ROLES, "DIRECTOR", "SECRETARY", "TEACHER"), requireSchool, requireHigherEd, getActivePolicy);
+router.get("/active", authMiddleware, authorizeRoles(...MANAGE_ROLES, "DIRECTOR", "STAFF", "TEACHER"), requireSchool, requireHigherEd, getActivePolicy);
 router.patch("/active", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, requireHigherEd, updateActivePolicy);
 
 module.exports = router;

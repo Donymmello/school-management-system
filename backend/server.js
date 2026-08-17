@@ -24,6 +24,7 @@ const resultRoutes = require('./routes/results.routes');
 const gradeRoutes = require('./routes/grades.routes');
 const attendanceRoutes = require('./routes/attendance.routes');
 const academicPolicyRoutes = require('./routes/academicPolicies.routes');
+const feeRoutes = require('./routes/fees.routes');
 //const emailRoutes = require('./routes/emails');
 
 const app = express();
@@ -51,6 +52,7 @@ app.use('/api/staff', staffRoutes);
 app.use('/api/grades', gradeRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/academic-policies', academicPolicyRoutes);
+app.use('/api/fees', feeRoutes);
 //app.use('/api/emails', emailRoutes);
 
 async function startServer() {

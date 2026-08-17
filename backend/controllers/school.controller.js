@@ -3,6 +3,7 @@ const { School, User, AcademicPolicy, sequelize } = require("../models");
 const { generateEmployeeCode } = require("../utils/generateCode");
 const registerLogAudit = require("../utils/logAudit");
 const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
+const { validateCurrency } = require("../utils/validators");
 const { generateToken, mapUserToResponse } = require("./auth.controller");
 
 const ACADEMIC_MODELS = ["SECONDARY", "HIGHER_ED"];
@@ -17,6 +18,7 @@ async function registerSchool(req, res) {
       slug,
       plan,
       academicModel,
+      currency,
       adminName,
       adminEmail,
       adminPassword,
@@ -44,6 +46,13 @@ async function registerSchool(req, res) {
       });
     }
 
+    let currencyValue;
+    if (currency !== undefined) {
+      const currencyCheck = validateCurrency(currency);
+      if (currencyCheck.error) return res.status(400).json({ message: currencyCheck.error });
+      currencyValue = currencyCheck.value;
+    }
+
     const result = await sequelize.transaction(async (t) => {
       const school = await School.create(
         {
@@ -53,6 +62,7 @@ async function registerSchool(req, res) {
           slug,
           plan: plan || "FREE",
           academicModel,
+          currency: currencyValue || "AOA",
           status: "ACTIVE",
         },
         { transaction: t }
@@ -117,7 +127,7 @@ async function registerSchool(req, res) {
 
 async function createSchool(req, res) {
   try {
-    const { name, address, email, slug, plan, academicModel } = req.body;
+    const { name, address, email, slug, plan, academicModel, currency } = req.body;
 
     if (!name || !address || !email || !slug) {
       return res.status(400).json({
@@ -132,6 +142,13 @@ async function createSchool(req, res) {
       });
     }
 
+    let currencyValue;
+    if (currency !== undefined) {
+      const currencyCheck = validateCurrency(currency);
+      if (currencyCheck.error) return res.status(400).json({ message: currencyCheck.error });
+      currencyValue = currencyCheck.value;
+    }
+
     const existing = await School.findOne({ where: { slug } });
     if (existing) {
       return res.status(409).json({ message: "A school with this slug already exists." });
@@ -139,7 +156,7 @@ async function createSchool(req, res) {
 
     const school = await sequelize.transaction(async (t) => {
       const created = await School.create(
-        { name, address, email, slug, plan: plan || "FREE", academicModel },
+        { name, address, email, slug, plan: plan || "FREE", academicModel, currency: currencyValue || "AOA" },
         { transaction: t }
       );
       await AcademicPolicy.create({ schoolId: created.id, active: true }, { transaction: t });
@@ -185,7 +202,14 @@ async function updateSchool(req, res) {
     const school = await School.findByPk(req.params.id);
     if (!school) return res.status(404).json({ message: "School not found." });
 
-    const { name, address, email, logo, plan, status } = req.body;
+    const { name, address, email, logo, plan, status, currency } = req.body;
+
+    let currencyValue;
+    if (currency !== undefined) {
+      const currencyCheck = validateCurrency(currency);
+      if (currencyCheck.error) return res.status(400).json({ message: currencyCheck.error });
+      currencyValue = currencyCheck.value;
+    }
 
     await school.update({
       name: name ?? school.name,
@@ -194,6 +218,7 @@ async function updateSchool(req, res) {
       logo: logo ?? school.logo,
       plan: plan ?? school.plan,
       status: status ?? school.status,
+      currency: currencyValue ?? school.currency,
     });
 
     return res.status(200).json({ message: "School updated successfully.", school });

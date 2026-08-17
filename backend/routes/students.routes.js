@@ -10,6 +10,7 @@ const requireSchool = require("../middleware/tenant.middleware");
 const {
   getAllStudents,
   getStudentById,
+  getMyProfile,
   updateStudent,
   deleteStudent,
 } = require('../controllers/student.controller');
@@ -21,6 +22,8 @@ router.get(
   requireSchool,
   getAllStudents
 );
+// Precisa vir antes de "/:id" — senão o Express casaria "me" como :id.
+router.get('/me', authMiddleware, authorizeRoles("STUDENT"), getMyProfile);
 router.get(
   '/:id',
   authMiddleware,

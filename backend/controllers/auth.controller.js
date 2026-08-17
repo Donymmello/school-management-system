@@ -129,10 +129,13 @@ const registerUser = async (req, res) => {
       });
     }
 
+    // SECRETARY foi unificado em STAFF (papéis se sobrepunham por completo —
+    // ver docs/project-rules.md, seção 7): não é mais oferecido pra
+    // cadastro de usuário novo. Continua existindo no ENUM do banco só pra
+    // não quebrar linhas antigas que já tenham esse valor.
     const permittedRoles = [
       "ADMIN",
       "DIRECTOR",
-      "SECRETARY",
       "STAFF",
       "TEACHER",
       "STUDENT",
@@ -516,6 +519,50 @@ const getMe = async (req, res) => {
   }
 };
 
+// Trocar a própria senha, logado. Fecha uma promessa que já existia no
+// formulário de criação de aluno/professor ("pode trocar depois do primeiro
+// acesso") mas nunca tinha sido implementada — ver docs/project-rules.md,
+// seção 6, item 5. Diferente de forgotPassword/resetPassword (que são pra
+// quem perdeu acesso, ainda sem envio de email de verdade — ver seção 7):
+// aqui a pessoa já está autenticada, só precisa confirmar a senha atual.
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "currentPassword and newPassword are required." });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "newPassword must be at least 6 characters long." });
+    }
+
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found." });
+
+    const isCurrentValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isCurrentValid) {
+      return res.status(401).json({ message: "Current password is incorrect." });
+    }
+
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    await registerLogAudit({
+      userId: user.id,
+      action: "UPDATE",
+      entity: "User",
+      entityId: user.id,
+      description: "Password changed by the user.",
+    });
+
+    return res.status(200).json({ message: "Password changed successfully." });
+  } catch (error) {
+    console.error("[Error changing password]:", error);
+    return res.status(500).json({ message: "An error occurred while changing the password." });
+  }
+};
+
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -574,6 +621,7 @@ module.exports = {
   registerUser,
   login,
   getMe,
+  changePassword,
   forgotPassword,
   resetPassword,
   generateToken,

@@ -9,6 +9,7 @@ const PasswordResetToken = require("./passwordResetToken");
 
 const Attendance = require("./attendance");
 const Grade = require("./grade");
+const Fee = require("./fee");
 const Assessment = require("./assessment");
 const StudentAssessment = require("./studentAssessment");
 const AcademicPolicy = require("./academicPolicy");
@@ -174,6 +175,17 @@ Student.belongsTo(Course, {
 Course.hasMany(Student, {
   foreignKey: "courseId",
   as: "students",
+});
+
+// Student 1 - N Fee
+Student.hasMany(Fee, {
+  foreignKey: "studentId",
+  as: "fees",
+});
+
+Fee.belongsTo(Student, {
+  foreignKey: "studentId",
+  as: "student",
 });
 
 /*
@@ -439,6 +451,7 @@ module.exports = {
 
   Attendance,
   Grade,
+  Fee,
 
   Subject,
   Assessment,

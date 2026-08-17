@@ -59,7 +59,7 @@ export default function RegisterSchoolPage() {
     try {
       const { token, school, user } = await registerSchool(form);
       setSession(token, { ...user, school });
-      navigate("/", { replace: true });
+      navigate("/painel", { replace: true });
     } catch (err) {
       setError(getErrorMessage(err, "Não foi possível cadastrar a escola."));
     } finally {

@@ -14,3 +14,8 @@ export async function fetchMe() {
   const { data } = await apiClient.get("/auth/me");
   return data;
 }
+
+export async function changePassword(currentPassword, newPassword) {
+  const { data } = await apiClient.patch("/auth/change-password", { currentPassword, newPassword });
+  return data;
+}

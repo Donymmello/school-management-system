@@ -19,12 +19,13 @@ import CollectionsBookmarkOutlinedIcon from "@mui/icons-material/CollectionsBook
 import AssignmentIndOutlinedIcon from "@mui/icons-material/AssignmentIndOutlined";
 import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
 import GradeOutlinedIcon from "@mui/icons-material/GradeOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import DomainOutlinedIcon from "@mui/icons-material/DomainOutlined";
 
 export const DRAWER_WIDTH = 240;
 
 const NAV_ITEMS = [
-  { to: "/", label: "Início", icon: <SpaceDashboardOutlinedIcon />, roles: null },
+  { to: "/painel", label: "Início", icon: <SpaceDashboardOutlinedIcon />, roles: null },
   {
     to: "/alunos",
     label: "Alunos",
@@ -41,13 +42,13 @@ const NAV_ITEMS = [
     to: "/professores",
     label: "Professores",
     icon: <SchoolOutlinedIcon />,
-    roles: ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "SECRETARY"],
+    roles: ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "STAFF"],
   },
   {
     to: "/disciplinas",
     label: "Disciplinas",
     icon: <MenuBookOutlinedIcon />,
-    roles: ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "SECRETARY", "TEACHER"],
+    roles: ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "STAFF", "TEACHER"],
   },
   {
     to: "/cursos",
@@ -67,20 +68,26 @@ const NAV_ITEMS = [
     to: "/matriculas",
     label: "Matrículas",
     icon: <AssignmentIndOutlinedIcon />,
-    roles: ["SUPER_ADMIN", "ADMIN", "STAFF", "DIRECTOR"],
+    roles: ["SUPER_ADMIN", "ADMIN", "STAFF", "DIRECTOR", "STUDENT"],
     academicModel: "HIGHER_ED",
   },
   {
     to: "/frequencia",
     label: "Frequência",
     icon: <EventAvailableOutlinedIcon />,
-    roles: ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "SECRETARY", "TEACHER"],
+    roles: ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "STAFF", "TEACHER", "STUDENT"],
   },
   {
     to: "/notas",
     label: "Notas",
     icon: <GradeOutlinedIcon />,
-    roles: ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "SECRETARY", "TEACHER"],
+    roles: ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "TEACHER", "STAFF", "STUDENT"],
+  },
+  {
+    to: "/propinas",
+    label: "Propinas",
+    icon: <ReceiptLongOutlinedIcon />,
+    roles: ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "STAFF", "STUDENT"],
   },
   {
     to: "/escolas",
@@ -110,7 +117,7 @@ export default function NavDrawer({ role, academicModel, mobileOpen, onClose, va
             key={item.to}
             component={NavLink}
             to={item.to}
-            end={item.to === "/"}
+            end={item.to === "/painel"}
             onClick={onClose}
             sx={{
               mx: 1,

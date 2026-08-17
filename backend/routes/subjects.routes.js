@@ -25,7 +25,7 @@ router.post(
 router.get(
   "/",
   authMiddleware,
-  authorizeRoles("ADMIN", "SUPER_ADMIN", "DIRECTOR", "SECRETARY", "TEACHER"),
+  authorizeRoles("ADMIN", "SUPER_ADMIN", "DIRECTOR", "STAFF", "TEACHER"),
   requireSchool,
   getAllSubjects
 );
@@ -33,7 +33,7 @@ router.get(
 router.get(
   "/:id",
   authMiddleware,
-  authorizeRoles("ADMIN", "SUPER_ADMIN", "DIRECTOR", "SECRETARY", "TEACHER"),
+  authorizeRoles("ADMIN", "SUPER_ADMIN", "DIRECTOR", "STAFF", "TEACHER"),
   requireSchool,
   getSubjectById
 );

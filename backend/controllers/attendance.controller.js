@@ -2,6 +2,7 @@ const { Attendance, Student } = require("../models");
 const registerLogAudit = require("../utils/logAudit");
 const { tenantWhere } = require("../utils/tenantScope");
 const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
+const { resolveOwnStudentId } = require("../utils/selfScope");
 
 const ALLOWED_STATUSES = ["PRESENT", "ABSENT", "LATE", "JUSTIFIED"];
 
@@ -64,7 +65,17 @@ async function getAllAttendance(req, res) {
   try {
     const { studentId, date } = req.query;
     const where = {};
-    if (studentId) where.studentId = studentId;
+
+    // Portal do aluno: ignora studentId da query e força o próprio registro
+    // (ver docs/project-rules.md, seção 6, item 5).
+    if (req.user.role === "STUDENT") {
+      const ownStudentId = await resolveOwnStudentId(req);
+      if (!ownStudentId) return res.status(403).json({ message: "Student profile not found for this user." });
+      where.studentId = ownStudentId;
+    } else if (studentId) {
+      where.studentId = studentId;
+    }
+
     if (date) where.date = date;
 
     const records = await Attendance.findAll({

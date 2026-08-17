@@ -15,6 +15,7 @@ import {
 import MenuIcon from "@mui/icons-material/Menu";
 import { useAuth } from "../context/AuthContext.jsx";
 import NavDrawer, { DRAWER_WIDTH } from "./NavDrawer.jsx";
+import ChangePasswordDialog from "../components/ChangePasswordDialog.jsx";
 
 const ROLE_LABELS = {
   SUPER_ADMIN: "Dono da plataforma",
@@ -32,6 +33,7 @@ export default function DashboardLayout() {
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState(null);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   const schoolName = user?.school?.name;
 
@@ -77,10 +79,20 @@ export default function DashboardLayout() {
                 </Typography>
               </Box>
             </MenuItem>
+            <MenuItem
+              onClick={() => {
+                setMenuAnchor(null);
+                setChangePasswordOpen(true);
+              }}
+            >
+              Trocar senha
+            </MenuItem>
             <MenuItem onClick={logout}>Sair</MenuItem>
           </Menu>
         </Toolbar>
       </AppBar>
+
+      <ChangePasswordDialog open={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} />
 
       <NavDrawer
         role={user?.role}

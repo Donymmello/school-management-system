@@ -58,27 +58,85 @@ escola usa, pra sempre:
 ## 3. Modelo de negócio
 
 - Assinatura **mensal ou anual por escola/faculdade** (não por aluno).
-- Planos já modelados em `School.plan`: `FREE`, `BASIC`, `PREMIUM`.
+- Planos já modelados em `School.plan`: `FREE`, `BASIC`, `PREMIUM` — **os mesmos 3
+  para os dois `academicModel`, sem mudança de schema.** Decisão: não criar um
+  catálogo de plano separado por tipo de instituição (ex: enum maior ou tabela de
+  planos própria) — o `HIGHER_ED` naturalmente usa mais módulos (Cursos, Ofertas,
+  Matrículas, Avaliações) que só ele tem acesso, o que já justifica cobrar mais caro
+  por um plano de mesmo nome sem precisar modelar isso no banco.
+- **O preço cobrado de fato varia por `academicModel`** — isso é só uma tabela de
+  referência pro `SUPER_ADMIN` usar quando ajusta `School.plan`/`status` manualmente
+  em `/escolas` (hoje não tem cobrança automatizada, então não tem onde outro lugar
+  isso precisaria estar codificado):
+
+  | Plano   | `SECONDARY` | `HIGHER_ED` |
+  |---------|-------------|-------------|
+  | FREE    | —           | —           |
+  | BASIC   | TBD         | TBD (> SECONDARY) |
+  | PREMIUM | TBD         | TBD (> SECONDARY) |
+
+  Valores em aberto — ninguém definiu preço concreto ainda. A regra combinada é só
+  a *relação* (HIGHER_ED custa mais que SECONDARY no mesmo plano), não os números.
 - **Nº de alunos também deve influenciar o plano/preço** — mecanismo exato (teto fixo
-  por plano, preço escalonado por faixa de alunos, ou os dois) ainda não decidido. Ver
-  item 7.
+  por plano, preço escalonado por faixa de alunos, ou os dois) ainda não decidido, e
+  é uma variável independente da tabela acima (as duas — tipo de instituição e nº de
+  alunos — precisam ser combinadas quando o billing automatizado for desenhado de
+  verdade). Ver item 7.
 - Cobrança automatizada (gateway de pagamento) fica para depois do MVP — ver roadmap.
 
 ## 4. Papéis e permissões
 
-Enum atual em `User.role`: `SUPER_ADMIN, ADMIN, DIRECTOR, SECRETARY, TEACHER, STUDENT, STAFF, USER`.
+**Lista final de papéis (decisão registrada — ver seção 7):**
 
-Não era a intenção original, mas a direção combinada é evoluir para:
+`SUPER_ADMIN, ADMIN, DIRECTOR, TEACHER, STAFF, STUDENT`
 
 - **SUPER_ADMIN** — dono/equipe do SaaS. Enxerga e administra todas as escolas
   (billing, status de conta, suporte). Não pertence a nenhuma `School` específica
   (`schoolId = null`).
 - **ADMIN** — administrador máximo de **uma** escola (`schoolId` obrigatório). Não vê
   dados de outras escolas.
-- **DIRECTOR / SECRETARY / TEACHER / STAFF / STUDENT** — papéis operacionais dentro de
-  uma escola, com permissões mais restritas que ADMIN.
-- `USER` é um valor default genérico do enum, sem uso funcional claro — candidato a
-  remover quando formos revisar o enum.
+- **DIRECTOR** — liderança acadêmica dentro de uma escola (visão ampla, mas sem os
+  poderes de conta/billing do ADMIN).
+- **STAFF** — pessoal de secretaria: lança nota, trata matrícula/inscrição, trata
+  propina/mensalidade do aluno, gerencia Turmas/Cursos/Ofertas/Disciplinas/
+  Professores. Único papel de "operação administrativa do dia a dia" — ver
+  unificação com SECRETARY abaixo.
+- **TEACHER** — lança nota/frequência dos próprios alunos (hoje sem filtro "só as
+  minhas turmas" nas telas administrativas — ver Portal do Professor, seção 6,
+  item 5).
+- **STUDENT** — portal próprio, somente leitura, auto-escopado (Notas, Frequência,
+  Matrículas, Propinas — ver seção 6, item 5).
+
+**SECRETARY foi unificado em STAFF.** Os dois papéis faziam exatamente a mesma
+coisa administrativa e a distinção nunca foi formalizada — decisão explícita do
+usuário: unificar num só papel em vez de manter os dois ou redefini-los
+separadamente. Efeito prático:
+- `permittedRoles` em `auth.controller.js` (`registerUser`) não oferece mais
+  `SECRETARY` pra cadastro de usuário novo.
+- Toda rota que antes listava `SECRETARY` nos papéis permitidos agora lista
+  `STAFF` no lugar (Professores, Disciplinas, Frequência, Notas, Propinas,
+  Resultado, Política Acadêmica, Escola).
+- `SECRETARY` continua no ENUM de `User.role` só como legado, pra não quebrar
+  linha antiga que já tenha esse valor — não é mais um caminho válido de
+  cadastro. Script `backend/scripts/migrate-secretary-to-staff.js` converte
+  qualquer usuário `SECRETARY` existente pra `STAFF` (rodar manualmente uma
+  vez, não faz parte do boot/sync normal do servidor).
+- `USER` continua um valor default genérico do enum, sem uso funcional claro —
+  candidato a remover numa limpeza futura do enum (baixa prioridade, não é o
+  mesmo tipo de problema que SECRETARY/STAFF).
+
+**Bug corrigido nesta rodada:** o ENUM real de `User.role` no banco não tinha
+`"STAFF"` — só `SUPER_ADMIN, ADMIN, TEACHER, DIRECTOR, SECRETARY, STUDENT, USER`
+— apesar de `auth.controller.js` e todas as rotas já tratarem STAFF como papel
+válido há várias rodadas. Qualquer `User.create({ role: "STAFF" })` teria
+falhado na validação do Sequelize antes de chegar no banco. Corrigido em
+`backend/models/user.js` ao formalizar essa lista.
+
+**Papéis considerados e adiados de propósito (não especulativos, decisão
+explícita do usuário — ver seção 7):** `COORDINATOR` (coordenador de curso,
+só faria sentido pra `HIGHER_ED`) e `GUARDIAN`/encarregado de educação
+(portal pros pais, nos moldes do Portal do Aluno). Nenhum dos dois tem pedido
+concreto ainda; adicionar agora seria especulativo.
 
 Regra geral: toda ação de um usuário não-SUPER_ADMIN é implicitamente restrita ao
 próprio `schoolId`.
@@ -88,7 +146,7 @@ próprio `schoolId`.
 **Status: implementado em todos os módulos ativos, inclusive os profundos de
 matrícula/notas (Student, Teacher, Staff, Course, Classroom, Subject,
 CourseOffering, CourseOfferingSubject, Enrollment, Schedule, Assessment,
-StudentAssessment, Grade, Attendance, AcademicPolicy).**
+StudentAssessment, Grade, Attendance, Fee, AcademicPolicy).**
 
 - `schoolId` em `User`, `Student`, `Teacher`, `Staff`, `Course`, `Classroom`, `Subject`,
   todos associados a `School`.
@@ -306,46 +364,185 @@ Ordem sugerida, do que destrava o quê:
    por ora o SUPER_ADMIN muda plano/status manualmente pela tela `/escolas`.
    **Pausado por decisão explícita ("os pagamentos pode esperar") — a
    prioridade agora é o item 5.**
-5. **Portais por papel (Professor, Aluno, Staff) — próximo, ainda não iniciado.**
-   Anotado por pedido explícito ("temos que organizar o portal dos
-   docentes/professores/alunos/e staff, anota só"), implementação fica pra
-   depois.
+5. **Portais por papel (Professor, Aluno, Staff) — em andamento, Portal do Aluno e Portal do Staff feitos, landing pública + troca de senha feitas.**
 
-   O que existe hoje (Professores, Disciplinas, Cursos, Ofertas, Matrículas,
-   Frequência, Notas — seção 6, item 3) são todas **telas administrativas**:
-   ADMIN/DIRECTOR/SECRETARY/STAFF operando o dado de terceiros. Não existe
-   ainda a visão "eu, logado como TEACHER/STUDENT/STAFF, vejo e opero só o que
-   é meu". É um tipo de tela diferente, não só mais um módulo CRUD:
+   O que existia até aqui (Professores, Disciplinas, Cursos, Ofertas,
+   Matrículas, Frequência, Notas — seção 6, item 3) eram todas **telas
+   administrativas**: ADMIN/DIRECTOR/SECRETARY/STAFF/TEACHER operando o dado
+   de terceiros. Não existia a visão "eu, logado como STUDENT, vejo só o que
+   é meu" — é um tipo de tela diferente, não só mais um módulo CRUD.
 
-   - **Portal do Professor**: turmas/disciplinas que ele leciona (via
-     `CourseOfferingSubject.teacherId`), lançar frequência/nota só dos seus
-     próprios alunos e disciplinas. Hoje os formulários de Frequência/Notas
-     deixam qualquer TEACHER escolher qualquer aluno num select aberto — não
-     restringem ao escopo do professor logado.
-   - **Portal do Aluno**: ver as próprias notas, frequência e status de
-     matrícula (pendente/aprovada/rejeitada), só leitura. Hoje STUDENT nem
-     está nas roles que acessam `/notas`, `/frequencia` ou `/matriculas`.
-   - **Portal do Staff**: ainda não dá pra desenhar — o papel STAFF hoje só
-     tem `position`/`department` no model, sem nenhuma função específica
-     atrelada. Precisa decidir o que um STAFF deveria ver/fazer antes de
-     desenhar a tela (ver item 7).
-   - Tecnicamente isso pede coisa que ainda não existe: um jeito de resolver
-     "qual é o meu registro operacional" a partir do usuário logado (hoje
-     `getMe` só devolve o `User` cru, não o `Teacher`/`Student`/`Staff`
-     vinculado), endpoints "meus dados" que filtrem por dono e não só por
-     escola, e um dashboard por papel em vez do `DashboardHome` genérico
-     atual.
+   **Portal do Aluno — feito:**
+   - `utils/selfScope.js` (novo) — `resolveOwnStudentId(req)`/
+     `resolveOwnTeacherId(req)` resolvem o `Student`/`Teacher` do usuário
+     logado a partir do `userId` do token. É o jeito padrão de qualquer
+     controller responder "isso é meu?" sem depender do `:id` da URL (que o
+     próprio usuário controla e poderia trocar pra ver dado de outro).
+   - `GET /api/students/me` (novo, só STUDENT) — o próprio registro
+     (`studentCode`, `grade`, etc.), mostrado direto no `DashboardHome`.
+   - `getAllGrades`, `getAllAttendance` e `getEnrollments` agora ignoram
+     `studentId` da querystring quando quem chama é STUDENT e forçam o
+     próprio id — um aluno não consegue mais ver nota/frequência/matrícula de
+     outro trocando o parâmetro. `getEnrollmentById` ganhou a mesma trava (a
+     rota já deixava STUDENT entrar, mas sem checar dono).
+   - Rotas `GET /grades`, `GET /attendance` e `GET /enrollments` (list)
+     ganharam STUDENT nos papéis permitidos — só a listagem, não
+     criar/editar/excluir nem os `GET /:id` de grade/attendance (que não têm
+     esse auto-escopo implementado, de propósito, pra não abrir uma rota sem
+     a trava correspondente).
+   - Frontend: `GradesListPage`/`AttendanceListPage` escondem "Lançar
+     nota"/"Registrar frequência" e as colunas de ação pro papel STUDENT
+     (`EnrollmentsListPage` já escondia, reaproveitado sem mudança). Título
+     vira "Minhas notas"/"Minha frequência"/"Minhas matrículas". Menu lateral
+     e rotas liberados pro STUDENT nos três.
+
+   **Portal do Professor — ainda bloqueado.** A ideia (turmas/disciplinas que
+   o professor leciona via `CourseOfferingSubject.teacherId`, lançar
+   nota/frequência só dos seus alunos) esbarra em duas coisas: (1) não existe
+   nenhuma tela administrativa de `CourseOfferingSubject` ainda — sem alguém
+   atribuir professor↔disciplina↔oferta pela UI, "minhas disciplinas" ficaria
+   sempre vazio; (2) pra escola `SECONDARY`, não existe *nenhuma* relação
+   professor↔turma↔disciplina no modelo de dado — `Teacher.subject` é só um
+   texto livre, não uma associação real. Fazer o portal de verdade pro
+   professor pede resolver isso primeiro, não só copiar o padrão do aluno.
+   `Grade.teacherId` já existe e dava pra usar pra um filtro "só as notas que
+   eu lancei" nas telas administrativas atuais — não implementado ainda,
+   fica de fácil acréscimo quando isso for prioridade.
+
+   **Portal do Staff — construído.** Decisão explícita: "o staff pode ser o
+   pessoal da secretaria responsável por também lançar as notas, tratar das
+   inscrições, tratar das propinas etc". Ou seja, STAFF é secretaria — não
+   precisa de portal "só leitura" tipo o do aluno, ele já opera as telas
+   administrativas normais (ganhou acesso a Notas e Propinas nesta rodada,
+   junto com Turmas/Cursos/Ofertas/Matrículas que já tinha). Numa rodada
+   posterior, STAFF também herdou tudo que SECRETARY tinha (Professores,
+   Disciplinas, Frequência, Resultado, Política Acadêmica) quando os dois
+   papéis foram unificados — ver seção 4 e 7.
+
+   **Landing pública + login único + troca de senha — construído.** Primeira
+   versão desta rodada tentou um login separado por portal (Aluno/Professor/
+   Secretaria/Administração, cada um com sua URL e restrição de papel) — o
+   usuário testou a ideia via pergunta e **mudou de decisão antes de
+   implementar de vez**: "vai ter [uma landing com] conteúdo que eu ainda
+   não sei, mas que terá um botão de login que dependendo das credenciais,
+   leva para o perfil certo". Ou seja, login continua único; quem decide o
+   que a pessoa vê depois é o papel da conta, não a URL usada pra entrar —
+   como já era antes, só que agora com uma porta de entrada pública na raiz
+   do site em vez de cair direto num formulário. Estado final:
+   - `/` (novo `pages/auth/LandingPage.jsx`) é público — hero simples
+     ("Sistema de Gestão Escolar" + botões Entrar/Cadastrar escola).
+     Conteúdo de marketing de verdade ainda não definido, propositalmente
+     mínimo por enquanto. Se a pessoa já está autenticada, `/` redireciona
+     sozinho pra `/painel` (não faz sentido mostrar a landing de novo pra
+     quem já tem sessão).
+   - `/login` voltou a ser um formulário único (email + senha), sem escolha
+     de portal — é o antigo `LoginPage.jsx`, recriado (tinha sido apagado
+     na tentativa anterior).
+   - **A home autenticada mudou de rota: `/` → `/painel`.** Precisou mudar
+     porque `/` agora é a landing pública — não dá pra ter duas telas
+     diferentes registradas no mesmo path. Atualizado em todo lugar que
+     apontava pra `/`: `NavDrawer` ("Início"), redirect pós-login
+     (`LoginPage`), redirect pós-cadastro de escola (`RegisterSchoolPage`),
+     os dois fallbacks de acesso negado em `RequireAuth.jsx` (antes
+     mandavam pra `/`, que agora rebateria de novo pra `/painel` via
+     `LandingPage` — ficou redirecionando direto).
+   - `api/client.js` (interceptor de 401) e o "voltar pro início" da
+     `NotFoundPage` continuam apontando pra `/login`/`/` sem mudança — já
+     estavam corretos nesse desenho.
+   - **Troca de senha, self-service (fechado nesta rodada também):** o
+     formulário de criar aluno já prometia "pode trocar depois do primeiro
+     acesso" mas isso nunca tinha sido construído. Agora existe
+     `PATCH /api/auth/change-password` (autenticado, exige senha atual +
+     nova, mínimo 6 caracteres) e um `ChangePasswordDialog` acessível pelo
+     menu do usuário (`DashboardLayout`), pra qualquer papel logado.
+     Diferente de esqueci-senha (que seria pra quem perdeu acesso) — aqui a
+     pessoa já está logada, só confirma a senha atual.
+
+   **Propinas/mensalidades — implementado como ledger manual (v1).** Não é o
+   mesmo billing do item 4 (que é o SaaS cobrando a *escola*) — isso aqui é a
+   escola cobrando o *aluno*. Escopo decidido com o usuário antes de
+   modelar (ver decisão registrada na seção 7):
+   - Model novo `Fee` (`backend/models/fee.js`): `studentId`, `description`,
+     `amount` (DECIMAL), `currency`, `dueDate`, `status`
+     (`PENDING`/`PAID`), `paidAt`, `notes`. Sem `schoolId` próprio — isolado
+     por escola via join obrigatório no `Student` dono do registro, mesmo
+     padrão de `Grade`/`Attendance` (ver seção 5).
+   - **Sem status `OVERDUE` guardado.** "Atrasado" é derivado em tela
+     (`status === PENDING && dueDate < hoje`), não persistido — evita dado
+     parado mentir depois que o relógio passa do vencimento. Ver
+     `isOverdue()` em `frontend/src/pages/fees/FeesListPage.jsx`.
+   - `School.currency` (default `"AOA"`, editável por ADMIN/SUPER_ADMIN em
+     `SchoolFormDialog`) — cada `Fee` copia esse valor no momento da
+     criação (não é FK vivo); trocar a moeda da escola depois não altera
+     lançamentos antigos.
+   - Vínculo em `Student` (não `Enrollment`) de propósito — `Enrollment` só
+     existe pra `HIGHER_ED`; `Student` cobre os dois `academicModel`.
+   - Sem gateway de pagamento — pagamento acontece fora do sistema, STAFF só
+     registra o status via `PATCH /api/fees/:id/status`.
+   - Rotas: `POST/GET/PATCH/DELETE /api/fees`, `PATCH /api/fees/:id/status`.
+     `MANAGE_ROLES = SUPER_ADMIN, ADMIN, DIRECTOR, STAFF`; exclusão restrita a
+     `SUPER_ADMIN, ADMIN, DIRECTOR`. `STUDENT` entra só na listagem,
+     auto-escopado (portal do aluno, mesmo padrão de
+     Notas/Frequência/Matrículas).
+   - Frontend: `/propinas` — `FeesListPage`/`FeeFormDialog`, com toggle
+     pago/pendente inline; título e colunas mudam pra "Minhas propinas"
+     somente-leitura quando `STUDENT`.
 
 ## 7. Decisões em aberto
 
 - ~~Se cada escola poderá alternar entre "modo escola" e "modo faculdade", ou se
   isso é fixo no cadastro.~~ **Decidido:** fixo no cadastro (`School.academicModel`,
   imutável). Ver seção 2 e 5.
-- Se o enum `role` deve ganhar papel específico para faculdade (ex: `COORDINATOR`) ou os
-  papéis atuais bastam.
+- ~~Se o enum `role` deve ganhar papel específico para faculdade (ex: `COORDINATOR`) ou
+  os papéis atuais bastam.~~ **Decidido:** lista final fechada em
+  `SUPER_ADMIN, ADMIN, DIRECTOR, TEACHER, STAFF, STUDENT` (SECRETARY unificado em
+  STAFF — ver seção 4). `COORDINATOR` (coordenador de curso, só faria sentido pra
+  `HIGHER_ED`) e `GUARDIAN`/encarregado de educação (portal pros pais) foram
+  considerados e adiados de propósito — nenhum pedido concreto ainda,
+  adicionar agora seria especulativo. Reabrir quando/se um cliente pedir.
 - Estratégia de billing (gateway, moeda, país) — fica para quando chegarmos no item 4.
 - Como o nº de alunos influencia o plano/preço (teto por plano vs. preço escalonado vs.
   ambos) — decidir antes de implementar o item 4 do roadmap (billing).
-- O que um STAFF genérico deveria ver/fazer no próprio portal — hoje o papel só tem
-  `position`/`department` no model, sem função específica atrelada. Decidir antes de
-  desenhar o portal do item 5.
+- ~~Se plano/preço deveria variar por tipo de instituição.~~ **Decidido:** sim, mas sem
+  mudar schema — mesmos 3 planos (`FREE/BASIC/PREMIUM`), preço de fato varia por
+  `academicModel` numa tabela de referência manual pro SUPER_ADMIN (ver seção 3).
+  Os valores concretos da tabela continuam TBD — falta decidir junto com o item
+  acima (nº de alunos) antes de fechar o item 4 do roadmap.
+- ~~O que um STAFF genérico deveria ver/fazer.~~ **Decidido:** é secretaria —
+  lança nota, trata inscrição, trata propina. Ver seção 4.
+- ~~Escopo de propinas/mensalidades.~~ **Decidido e implementado (v1):** ledger
+  manual (sem cálculo automático de multa), pendurado em `Student` (não
+  `Enrollment`, pra cobrir `SECONDARY` também), sem gateway de pagamento
+  (controle interno, pagamento acontece fora do sistema), moeda configurável
+  por escola (`School.currency`). Ver seção 6, item 5. Fica em aberto pra
+  quando/se fizer sentido evoluir: cobrança automática com vencimento/multa,
+  integração com gateway (Multicaixa/M-Pesa/cartão dependendo do país),
+  periodicidade recorrente automática em vez de lançamento manual por
+  período.
+- **Tela de criar STAFF — ainda não existe.** `staff.routes.js` só tem
+  GET/PATCH/DELETE, nenhum POST ligado a frontend (diferente de Teacher e
+  Student, que têm `TeacherFormDialog`/`StudentFormDialog` criando via
+  `/auth/register-user`). Hoje a única forma de criar uma conta STAFF é
+  chamar a API direto. Adiado de propósito nesta rodada (decisão explícita:
+  "fica pra depois") — próxima rodada de portal/acesso deve incluir isso.
+- **Auto-cadastro (self-service) — nenhum papel operacional se cadastra
+  sozinho hoje**, só a escola em si (`/registrar-escola`, que cria a escola
+  + o primeiro ADMIN). Levantado ao decidir a landing page:
+  - `POST /api/auth/register-student` já existe e é público, mas está
+    incompleto (exige `schoolId` explícito no body — sem resolução por
+    slug/subdomínio da escola) e **não tem nenhuma tela no frontend**
+    consumindo. Aluno hoje é sempre cadastrado por um ADMIN/DIRECTOR.
+  - Professor e Staff não têm nenhum caminho de self-registro, nem
+    incompleto — sempre criados por quem já tem acesso administrativo.
+  - Não decidido ainda se vale a pena terminar o auto-cadastro de aluno
+    (métrica de esforço: resolver escola por slug + tela pública) ou se o
+    fluxo "admin cadastra todo mundo" é suficiente pro produto.
+- **Esqueci minha senha — só existe o esqueleto no backend.**
+  `forgotPassword`/`resetPassword` geram e validam token real (expira em 15
+  min), mas a entrega do link de reset é só um `console.log` no servidor —
+  não tem envio de email de verdade (`email.routes.js` nunca foi terminado,
+  ver seção 5) — e não existe nenhuma tela no frontend pra iniciar o pedido
+  nem pra colar o token. "Trocar minha senha" (logado, com a senha atual)
+  foi implementado nesta rodada e resolve o caso "lembro a senha atual, só
+  quero trocar" — mas "esqueci de verdade" continua sem solução até ter um
+  serviço de email real por trás.

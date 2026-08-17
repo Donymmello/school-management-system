@@ -12,7 +12,7 @@ const {
   deleteTeacher,
 } = require("../controllers/teacher.controller");
 
-const MANAGE_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "SECRETARY"];
+const MANAGE_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "STAFF"];
 
 router.get("/", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, getAllTeachers);
 router.get("/:id", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, getTeacherById);

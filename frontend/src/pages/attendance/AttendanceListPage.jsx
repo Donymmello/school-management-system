@@ -21,13 +21,20 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
 import { deleteAttendance, listAttendance } from "../../api/attendance.js";
 import { getErrorMessage } from "../../api/errors.js";
+import { useAuth } from "../../context/AuthContext.jsx";
 import ConfirmDialog from "../../components/ConfirmDialog.jsx";
 import AttendanceFormDialog from "./AttendanceFormDialog.jsx";
 
 const STATUS_LABELS = { PRESENT: "Presente", ABSENT: "Ausente", LATE: "Atrasado", JUSTIFIED: "Falta justificada" };
 const STATUS_COLORS = { PRESENT: "success", ABSENT: "error", LATE: "warning", JUSTIFIED: "default" };
+const READ_ONLY_ROLES = ["STUDENT"];
 
 export default function AttendanceListPage() {
+  const { user } = useAuth();
+  // Portal do aluno: STUDENT só lê a própria frequência (auto-escopado no
+  // backend) — sem criar/editar/excluir (ver docs/project-rules.md, seção 6,
+  // item 5).
+  const readOnly = READ_ONLY_ROLES.includes(user?.role);
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -86,11 +93,13 @@ export default function AttendanceListPage() {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} gap={2}>
         <Typography variant="h4" component="h1">
-          Frequência
+          {readOnly ? "Minha frequência" : "Frequência"}
         </Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
-          Registrar frequência
-        </Button>
+        {!readOnly && (
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
+            Registrar frequência
+          </Button>
+        )}
       </Box>
 
       {error && (
@@ -106,14 +115,14 @@ export default function AttendanceListPage() {
               <TableCell>Aluno</TableCell>
               <TableCell>Data</TableCell>
               <TableCell>Status</TableCell>
-              <TableCell align="right">Ações</TableCell>
+              {!readOnly && <TableCell align="right">Ações</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
             {loading &&
               Array.from({ length: 4 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 4 }).map((__, j) => (
+                  {Array.from({ length: readOnly ? 3 : 4 }).map((__, j) => (
                     <TableCell key={j}>
                       <Skeleton />
                     </TableCell>
@@ -123,15 +132,17 @@ export default function AttendanceListPage() {
 
             {!loading && records.length === 0 && !error && (
               <TableRow>
-                <TableCell colSpan={4}>
+                <TableCell colSpan={readOnly ? 3 : 4}>
                   <Box textAlign="center" py={6} role="status">
                     <EventAvailableOutlinedIcon sx={{ fontSize: 40, color: "text.disabled" }} />
                     <Typography variant="subtitle1" sx={{ mt: 1 }}>
                       Nenhum registro de frequência
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Clique em "Registrar frequência" para começar.
-                    </Typography>
+                    {!readOnly && (
+                      <Typography variant="body2" color="text.secondary">
+                        Clique em "Registrar frequência" para começar.
+                      </Typography>
+                    )}
                   </Box>
                 </TableCell>
               </TableRow>
@@ -150,22 +161,24 @@ export default function AttendanceListPage() {
                       variant="outlined"
                     />
                   </TableCell>
-                  <TableCell align="right">
-                    <IconButton
-                      aria-label={`Editar frequência de ${record.student?.name}`}
-                      onClick={() => openEdit(record)}
-                      size="small"
-                    >
-                      <EditOutlinedIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      aria-label={`Excluir frequência de ${record.student?.name}`}
-                      onClick={() => setDeletingRecord(record)}
-                      size="small"
-                    >
-                      <DeleteOutlineIcon fontSize="small" />
-                    </IconButton>
-                  </TableCell>
+                  {!readOnly && (
+                    <TableCell align="right">
+                      <IconButton
+                        aria-label={`Editar frequência de ${record.student?.name}`}
+                        onClick={() => openEdit(record)}
+                        size="small"
+                      >
+                        <EditOutlinedIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        aria-label={`Excluir frequência de ${record.student?.name}`}
+                        onClick={() => setDeletingRecord(record)}
+                        size="small"
+                      >
+                        <DeleteOutlineIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
           </TableBody>

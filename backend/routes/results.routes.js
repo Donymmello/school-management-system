@@ -16,7 +16,7 @@ const {
 router.get(
   "/:enrollmentId/:courseOfferingSubjectId",
   authMiddleware,
-  authorizeRoles("SUPER_ADMIN", "ADMIN", "DIRECTOR", "SECRETARY", "TEACHER", "STUDENT"),
+  authorizeRoles("SUPER_ADMIN", "ADMIN", "DIRECTOR", "STAFF", "TEACHER", "STUDENT"),
   requireSchool,
   requireAcademicModel("HIGHER_ED"),
   getStudentResult
