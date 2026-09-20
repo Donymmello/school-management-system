@@ -5,7 +5,12 @@ const { Op } = require("sequelize");
 const { User, Student, Teacher, Staff, School, Turma, PasswordResetToken, sequelize } = require("../models");
 const { generateStudentCode, generateEmployeeCode } = require("../utils/generateCode");
 const registerLogAudit = require("../utils/logAudit");
-const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
+const {
+  isUniqueConstraintError,
+  respondUniqueConstraint,
+  isValidationError,
+  respondValidationError,
+} = require("../utils/dbErrors");
 const sendEmail = require("../utils/email");
 
 const generateToken = (user) => {
@@ -292,6 +297,7 @@ const registerUser = async (req, res) => {
     });
   } catch (error) {
     if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
+    if (isValidationError(error)) return respondValidationError(res, error);
     console.error("[Error registering user]:", error);
     return res.status(500).json({ message: "Error occurred while registering user." });
   }

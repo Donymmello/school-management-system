@@ -16,6 +16,14 @@ import { listTurmas } from "../../api/turmas.js";
 import { getErrorMessage } from "../../api/errors.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 
+// Códigos têm de bater com ID_DOCUMENT_TYPES em backend/models/student.js —
+// é de lá que vem o validate: { isIn } que recusa qualquer outro valor.
+const ID_DOCUMENT_TYPES = [
+  { value: "BI", label: "Bilhete de Identidade" },
+  { value: "PASSPORT", label: "Passaporte" },
+  { value: "OTHER", label: "Outro" },
+];
+
 const emptyForm = {
   name: "",
   email: "",
@@ -184,15 +192,23 @@ export default function StudentFormDialog({ open, student, onClose, onSaved }) {
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
-                label="Documento de identidade"
+                select
+                label="Tipo de documento"
                 value={form.idCard}
                 onChange={handleChange("idCard")}
                 fullWidth
-              />
+              >
+                <MenuItem value="">— Sem documento —</MenuItem>
+                {ID_DOCUMENT_TYPES.map((tipo) => (
+                  <MenuItem key={tipo.value} value={tipo.value}>
+                    {tipo.label}
+                  </MenuItem>
+                ))}
+              </TextField>
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
-                label="Número de identificação"
+                label="Número do documento"
                 value={form.idNumber}
                 onChange={handleChange("idNumber")}
                 fullWidth

@@ -1,6 +1,11 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../config/db");
 
+// Tipos de documento de identidade aceites. Lista partilhada com o frontend
+// (pages/students/StudentFormDialog.jsx) — os rótulos vivem lá, aqui ficam
+// só os códigos guardados em base de dados.
+const ID_DOCUMENT_TYPES = ["BI", "PASSPORT", "OTHER"];
+
 const Student = sequelize.define(
   "Student",
   {
@@ -77,17 +82,28 @@ const Student = sequelize.define(
       allowNull: true,
     },
 
+    // TIPO do documento, não o número (o número é o idNumber abaixo). Guardado
+    // como código e não como ENUM de propósito: no PostgreSQL um ENUM é um tipo
+    // e acrescentar um valor exige ALTER TYPE — aqui é esperado que a lista
+    // cresça (cédula, carta de condução, DIRE...) sem migração.
+    // NÃO tem unique: era único global quando servia de número, o que agora
+    // deixaria uma única pessoa no sistema inteiro poder ter "BI".
     idCard: {
-      type: DataTypes.STRING(50),
+      type: DataTypes.STRING(20),
       allowNull: true,
-      unique: true,
       field: "id_card",
+      validate: {
+        isIn: {
+          args: [ID_DOCUMENT_TYPES],
+          msg: `idCard must be one of: ${ID_DOCUMENT_TYPES.join(", ")}.`,
+        },
+      },
     },
 
+    // Número do documento escolhido em idCard.
     idNumber: {
       type: DataTypes.STRING(100),
       allowNull: true,
-      unique: true,
       field: "id_number",
     },
 
@@ -102,7 +118,12 @@ const Student = sequelize.define(
     timestamps: true,
     createdAt: "created_at",
     updatedAt: false,
+    // Por escola, não global: a mesma pessoa pode estar inscrita em duas
+    // escolas da plataforma, e um único global impedia a segunda. Mesmo
+    // raciocínio do models/subject.js — ver docs/project-rules.md, secção 5.
+    indexes: [{ unique: true, name: "student_school_id_number", fields: ["school_id", "id_number"] }],
   }
 );
 
 module.exports = Student;
+module.exports.ID_DOCUMENT_TYPES = ID_DOCUMENT_TYPES;

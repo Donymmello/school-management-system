@@ -24,4 +24,30 @@ function respondUniqueConstraint(res, error) {
   });
 }
 
-module.exports = { isUniqueConstraintError, respondUniqueConstraint };
+/*
+  Erro de validação do próprio Sequelize (validate: {...} no model), distinto
+  do UniqueConstraintError acima. Sem isto, um valor inválido enviado pela API
+  (ex: um tipo de documento fora da lista) sobe até ao catch genérico e vira
+  500 — erro do servidor, quando o errado foi o pedido.
+  Nota: UniqueConstraintError herda de ValidationError no Sequelize, mas os
+  dois têm `name` distinto ("SequelizeUniqueConstraintError" vs
+  "SequelizeValidationError"), por isso a comparação por nome não os confunde.
+*/
+function isValidationError(error) {
+  return error?.name === "SequelizeValidationError";
+}
+
+function respondValidationError(res, error) {
+  const fields = error.errors?.map((e) => e.path).filter(Boolean) || [];
+  return res.status(400).json({
+    message: error.errors?.[0]?.message || "Invalid value.",
+    fields,
+  });
+}
+
+module.exports = {
+  isUniqueConstraintError,
+  respondUniqueConstraint,
+  isValidationError,
+  respondValidationError,
+};

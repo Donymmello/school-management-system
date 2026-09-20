@@ -15,7 +15,12 @@ const {
 } = require("../models");
 const registerLogAudit = require("../utils/logAudit");
 const { tenantWhere } = require("../utils/tenantScope");
-const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
+const {
+  isUniqueConstraintError,
+  respondUniqueConstraint,
+  isValidationError,
+  respondValidationError,
+} = require("../utils/dbErrors");
 const { calculateStudentResult } = require("../services/gradeCalculation.service");
 
 const TURMA_INCLUDE = { model: Turma, as: "turma", required: false, attributes: ["id", "name", "grade"] };
@@ -48,8 +53,13 @@ async function validateStudentData({ idNumber, userId, studentId = null }) {
   }
 }
 
+const blankToNull = (value) => (value === "" ? null : value);
+
 function errorTreatment(res, error, standardMessage) {
   if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
+  // Valor recusado por um validate: {...} do model é culpa do pedido, não do
+  // servidor — sem isto subia até ao 500 genérico lá em baixo.
+  if (isValidationError(error)) return respondValidationError(res, error);
 
   const map = {
     "A student with this ID number already exists.": { status: 400, message: error.message },
@@ -63,7 +73,7 @@ function errorTreatment(res, error, standardMessage) {
     return res.status(knownError.status).json({ message: knownError.message });
   }
 
-  console.error('[Error]: ${standardMessage}', error);
+  console.error(`[Error]: ${standardMessage}`, error);
   return res.status(500).json({ message: standardMessage });
 }
 
@@ -350,8 +360,11 @@ async function updateStudent(req, res) {
       grade: grade ?? student.grade,
       email: email ?? student.email,
       telephone: telephone ?? student.telephone,
-      idCard: idCard ?? student.idCard,
-      idNumber: idNumber ?? student.idNumber,
+      // "" do formulário significa "sem documento", não a string vazia — o
+      // isIn de idCard recusaria "" e o índice único de idNumber tratava ""
+      // como valor real (NULL não colide, "" colide).
+      idCard: "idCard" in req.body ? blankToNull(idCard) : student.idCard,
+      idNumber: "idNumber" in req.body ? blankToNull(idNumber) : student.idNumber,
       notes: notes ?? student.notes,
       userId: userId ?? student.userId,
       turmaId: "turmaId" in req.body ? turmaId : student.turmaId,
