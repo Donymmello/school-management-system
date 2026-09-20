@@ -25,3 +25,8 @@ export async function deleteTeacher(id) {
   const { data } = await apiClient.delete(`/teachers/${id}`);
   return data;
 }
+
+export async function getMySubjects() {
+  const { data } = await apiClient.get("/teachers/me/subjects");
+  return data;
+}

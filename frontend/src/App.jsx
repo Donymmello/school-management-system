@@ -26,6 +26,7 @@ import AttendanceListPage from "./pages/attendance/AttendanceListPage.jsx";
 import GradesListPage from "./pages/grades/GradesListPage.jsx";
 import MySchedulePage from "./pages/schedule/MySchedulePage.jsx";
 import StudyPlanPage from "./pages/studyPlan/StudyPlanPage.jsx";
+import MySubjectsPage from "./pages/teacherPortal/MySubjectsPage.jsx";
 import AcademicStatusPage from "./pages/studyPlan/AcademicStatusPage.jsx";
 import FeesListPage from "./pages/fees/FeesListPage.jsx";
 import FeeAlertsPage from "./pages/fees/FeeAlertsPage.jsx";
@@ -56,6 +57,7 @@ const ENROLLMENTS_ROLES = ["SUPER_ADMIN", "ADMIN", "STAFF", "DIRECTOR", "STUDENT
 const MY_SCHEDULE_ROLES = ["STUDENT"];
 // Fase 9c — "Meu plano de estudos", também só STUDENT.
 const STUDY_PLAN_ROLES = ["STUDENT"];
+const MY_SUBJECTS_ROLES = ["TEACHER"];
 // Fase 9d — "Minha situação curricular", também só STUDENT.
 const ACADEMIC_STATUS_ROLES = ["STUDENT"];
 const ATTENDANCE_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "STAFF", "TEACHER", "STUDENT"];
@@ -188,6 +190,14 @@ export default function App() {
             element={
               <RequireAuth allowedRoles={MY_SCHEDULE_ROLES}>
                 <MySchedulePage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/minhas-disciplinas"
+            element={
+              <RequireAuth allowedRoles={MY_SUBJECTS_ROLES}>
+                <MySubjectsPage />
               </RequireAuth>
             }
           />

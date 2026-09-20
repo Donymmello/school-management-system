@@ -580,18 +580,38 @@ Ordem sugerida, do que destrava o quê:
      `server.js`, `vite build` — 1103 módulos) — sem MySQL/Docker
      disponível neste ambiente.
 
-   **Portal do Professor — ainda bloqueado.** A ideia (turmas/disciplinas que
-   o professor leciona via `CourseOfferingSubject.teacherId`, lançar
-   nota/frequência só dos seus alunos) esbarra em duas coisas: (1) não existe
-   nenhuma tela administrativa de `CourseOfferingSubject` ainda — sem alguém
-   atribuir professor↔disciplina↔oferta pela UI, "minhas disciplinas" ficaria
-   sempre vazio; (2) pra escola `SECONDARY`, não existe *nenhuma* relação
-   professor↔turma↔disciplina no modelo de dado — `Teacher.subject` é só um
-   texto livre, não uma associação real. Fazer o portal de verdade pro
-   professor pede resolver isso primeiro, não só copiar o padrão do aluno.
-   `Grade.teacherId` já existe e dava pra usar pra um filtro "só as notas que
-   eu lancei" nas telas administrativas atuais — não implementado ainda,
-   fica de fácil acréscimo quando isso for prioridade.
+   **Portal do Professor — primeira fatia feita ("minhas disciplinas").** Os
+   dois bloqueios que esta seção listava caíram sozinhos nas fases seguintes,
+   e só se percebeu ao revisitar o roadmap:
+   - (1) "não existe tela administrativa de `CourseOfferingSubject`" — passou
+     a existir na **Fase 5** (`pages/courseOfferingSubjects/`), com atribuição
+     de professor no próprio formulário.
+   - (2) "pra `SECONDARY` não existe relação professor↔turma↔disciplina" —
+     passou a existir na **Fase 6**: `TurmaSubject.teacherId`, com associação
+     nos dois sentidos em `models/index.js` e atribuição via
+     `TurmaSubjectFormDialog`. O `Teacher.subject` (texto livre) continua lá,
+     mas já não é a única ligação possível.
+
+   Construído: `GET /api/teachers/me/subjects`
+   (`teacher.controller.js getMySubjects`, só TEACHER) e a tela
+   `/minhas-disciplinas` (`pages/teacherPortal/MySubjectsPage.jsx`). Mesmo
+   padrão do portal do aluno — o isolamento vem de resolver o `Teacher` do
+   próprio token (`utils/selfScope.js resolveOwnTeacherId`, que já existia e
+   nunca tinha sido usado) em vez de aceitar um id pela URL, e o backend
+   normaliza os dois `academicModel` num shape só (HIGHER_ED via
+   `CourseOfferingSubject`, SECONDARY via `TurmaSubject`), para a tela não ter
+   ramo por modelo.
+
+   **Deliberadamente fora desta fatia:** lançar nota/frequência restrito aos
+   próprios alunos. Isso é a parte que muda comportamento de escrita e pede
+   decidir o que acontece quando um professor deixa de leccionar uma
+   disciplina com notas já lançadas. `Grade.teacherId` já existe e serve para
+   um filtro "só as notas que eu lancei" nas telas administrativas atuais —
+   acréscimo fácil quando for prioridade.
+
+   **Validado:** `vite build` sem erros e ordem de rotas conferida
+   (`GET /me/subjects` antes de `GET /:id`, senão "me" seria lido como id).
+   Sem Docker neste ambiente, o endpoint não foi exercitado contra dado real.
 
    **Portal do Staff — construído.** Decisão explícita: "o staff pode ser o
    pessoal da secretaria responsável por também lançar as notas, tratar das
@@ -705,10 +725,11 @@ Ordem sugerida, do que destrava o quê:
         `GET /:id` ganharam `requireSchool`, e o controller agora filtra via
         inner join no `User` (`where: { schoolId: req.schoolId }`) quando
         quem pede não é `SUPER_ADMIN` sem filtro.
-   - **Portal do Professor.** Bloqueado até existir (a) uma tela administrativa
-     de `CourseOfferingSubject` (atribuir professor↔disciplina↔oferta) e (b),
-     pra `SECONDARY`, uma relação real professor↔turma↔disciplina no modelo de
-     dado — hoje `Teacher.subject` é só texto livre. Ver seção 6, item 5.
+   - ~~**Portal do Professor.** Bloqueado até existir (a) uma tela administrativa
+     de `CourseOfferingSubject` e (b), pra `SECONDARY`, uma relação real
+     professor↔turma↔disciplina no modelo de dado.~~ **Desbloqueado pelas Fases
+     5 e 6; primeira fatia ("minhas disciplinas") feita.** Falta lançar
+     nota/frequência restrito aos próprios alunos. Ver seção 6, item 5.
    - ~~**Ofertas→Disciplinas (`CourseOfferingSubject`), Horário (`Schedule`),
      Avaliações (`Assessment`/`StudentAssessment`) e Resultado final.**~~
      **Feito (Fase 5 do roadmap de execução).** Fluxo: `/ofertas` → botão

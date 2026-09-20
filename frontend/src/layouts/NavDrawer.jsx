@@ -102,6 +102,13 @@ const NAV_ITEMS = [
     roles: ["STUDENT"],
   },
   {
+    // Portal do Professor — só TEACHER, ver App.jsx MY_SUBJECTS_ROLES.
+    to: "/minhas-disciplinas",
+    label: "Minhas disciplinas",
+    icon: <MenuBookOutlinedIcon />,
+    roles: ["TEACHER"],
+  },
+  {
     // Fase 9c — só STUDENT, ver App.jsx STUDY_PLAN_ROLES.
     to: "/meu-plano-de-estudos",
     label: "Meu plano de estudos",
