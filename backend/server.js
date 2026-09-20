@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const { sequelize } = require("./models");
+const syncDatabase = require("./config/databaseSync");
 require("dotenv").config();
 
 
@@ -71,11 +72,18 @@ async function startServer() {
   try {
     // Testa a ligação com a base de dados
     await sequelize.authenticate();
-    console.log("MySQL connected.");
+    console.log("PostgreSQL connected.");
 
-    // Sincroniza os models com a base de dados
-    await sequelize.sync({ alter: true });
-    console.log("Models synchronized.");
+    // Sincroniza os models com a base de dados. Quem decide SE e COMO é o
+    // .env (DB_SYNC/DB_ALTER, ver config/databaseSync.js) — não mais um
+    // sync({ alter: true }) fixo em todo boot. Motivo: no PostgreSQL ENUM é
+    // um tipo de verdade (CREATE TYPE), não um modificador de coluna como no
+    // MySQL, e `alter` repetido sobre as 21 colunas ENUM deste projeto é
+    // ponto conhecido de atrito do Sequelize v6 (erro "type enum_... already
+    // exists" e tipos órfãos). Com DB_ALTER=false o sync ainda cria o que
+    // falta num banco vazio; mudança de schema em banco já populado pede
+    // DB_ALTER=true pontual ou migration via sequelize-cli.
+    await syncDatabase();
 
     // Inicia o servidor HTTP
     app.listen(PORT, () => {

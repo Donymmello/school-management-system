@@ -7,7 +7,7 @@
 
   Uso: node backend/scripts/migrate-secretary-to-staff.js
   (precisa das mesmas variáveis de ambiente que o server usa pra conectar
-  no MySQL — roda com o mesmo .env do backend.)
+  no PostgreSQL — roda com o mesmo .env do backend.)
 */
 require("dotenv").config();
 const { sequelize, User } = require("../models");

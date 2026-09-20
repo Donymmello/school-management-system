@@ -2,23 +2,24 @@ name: school-management-system
 
 services:
   school:
-    image: mysql:8.0
-    container_name: sms_mysql
+    image: postgres:16-alpine
+    container_name: sms_postgres
     env_file:
       - ./backend/.env
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASS}
-      MYSQL_DATABASE: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - sms_mysql_data:/var/lib/mysql
-    # sem isso, "depends_on" só espera o container do mysql existir, não o
-    # servidor estar pronto pra aceitar conexão (o primeiro boot demora minutos
-    # inicializando os arquivos do banco)
+      - sms_postgres_data:/var/lib/postgresql/data
+    # sem isso, "depends_on" só espera o container do postgres existir, não o
+    # servidor estar pronto pra aceitar conexão (no primeiro boot o initdb cria
+    # o cluster antes de abrir a porta)
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${DB_PASS}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -38,7 +39,7 @@ services:
     depends_on:
       school:
         condition: service_healthy
-    # se cair por qualquer motivo transitório (ex: mysql reiniciar), volta sozinho
+    # se cair por qualquer motivo transitório (ex: postgres reiniciar), volta sozinho
     restart: unless-stopped
 
   web_frontend:
@@ -56,4 +57,4 @@ services:
       - api_backend
 
 volumes:
-  sms_mysql_data:
+  sms_postgres_data:

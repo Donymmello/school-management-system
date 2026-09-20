@@ -61,8 +61,9 @@ async function getDashboardSummary(req, res) {
           // aparece no FROM). IMPORTANTE: qualificar com o alias que o
           // Sequelize dá à query ("Fee", o nome do model), não com o nome
           // real da tabela ("fees", ver backend/models/fee.js tableName) —
-          // o SQL gerado é `FROM \`fees\` AS \`Fee\``, então `fees.id` não
-          // bate com nenhum alias e quebra com "Unknown column" no MySQL.
+          // o SQL gerado é `FROM "fees" AS "Fee"`, então `fees.id` não bate
+          // com nenhum alias e quebra com `missing FROM-clause entry for
+          // table "fees"` no PostgreSQL (era "Unknown column" no MySQL).
           attributes: [
             "currency",
             [fn("COUNT", col("Fee.id")), "count"],

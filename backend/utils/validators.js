@@ -2,7 +2,7 @@
   Validações de input pequenas e reutilizadas em mais de um controller —
   evita duplicar a mesma checagem (currency aparece em Fee e School). Mesmo
   princípio do ALLOWED_STATUSES em attendance.controller.js: validar antes
-  de tocar o banco, pra devolver um 400 limpo em vez de deixar o MySQL
+  de tocar o banco, pra devolver um 400 limpo em vez de deixar o PostgreSQL
   estourar um erro cru (achado no code review desta rodada — ver
   docs/project-rules.md).
 */

@@ -5,7 +5,7 @@
 ## 0. Padrão de código
 
 - **ACID não é opcional.** Toda escrita que precisa ser única (email, código gerado,
-  nome dentro da escola) tem que ter uma `UNIQUE constraint` de verdade no MySQL por
+  nome dentro da escola) tem que ter uma `UNIQUE constraint` de verdade no PostgreSQL por
   trás — checagem "já existe?" em JS antes do `create()` é só UX (evita um round-trip
   desnecessário), nunca a garantia real, porque duas requisições concorrentes podem
   passar pela checagem ao mesmo tempo. A constraint é quem garante isolamento; o
@@ -15,7 +15,7 @@
   `auth.controller.js`) para atomicidade.
   Docs: [Sequelize Transactions](https://sequelize.org/docs/v6/other-topics/transactions/),
   [UniqueConstraintError](https://sequelize.org/api/v6/class/src/errors/validation/unique-constraint-error.ts~uniqueconstrainterror),
-  [MySQL InnoDB isolation levels](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html).
+  [PostgreSQL transaction isolation](https://www.postgresql.org/docs/16/transaction-iso.html).
 - Antes de assumir como uma lib/framework se comporta, checar a documentação oficial
   da versão que o projeto usa (não confiar de memória).
 - Consertar na raiz, não no sintoma: um bug num padrão repetido em vários controllers
@@ -1009,3 +1009,37 @@ Ordem sugerida, do que destrava o quê:
   investigação (comparar os registros das duas contas no banco, checar
   se `role`/`currency`/outro campo novo ficou `NULL` ou inválido na
   conta antiga) antes de qualquer go-live com dados existentes.
+- ~~Banco: MySQL 8.0.~~ **Decidido e implementado: PostgreSQL 16 (`postgres:16-alpine`).**
+  Troca puramente de infra/config — nenhum SQL cru no projeto, nenhuma query
+  dependia de função específica do MySQL. O que mudou: `docker-compose.yml`
+  (imagem, `POSTGRES_*`, porta 5432, volume `sms_postgres_data`, healthcheck
+  `pg_isready`), `backend/config/db.js` (`dialect: "postgres"`), driver
+  (`mysql2` → `pg` + `pg-hstore`) e `DB_PORT`/`DB_USER` nos dois `.env`
+  (raiz, usado pela interpolação do compose, e `backend/.env`, usado pela app).
+  - **Dado antigo não migra** — engine diferente, o volume `sms_mysql_data`
+    continua no disco mas nenhum serviço o monta. Banco novo nasce vazio pelo
+    `sequelize.sync()`. De quebra isso encerra o bug de "conta antiga não
+    loga" registrado acima: não existe mais conta antiga.
+  - **`alter` fixo removido do boot (feito junto com a migração).** `server.js`
+    chamava `sequelize.sync({ alter: true })` em todo boot. No PostgreSQL um
+    `ENUM` é um tipo de verdade (`CREATE TYPE`), não um modificador de coluna
+    como no MySQL, e `alter` repetido sobre as 21 colunas `ENUM` do projeto é
+    ponto conhecido de atrito do Sequelize v6 (`type "enum_..." already
+    exists`, tipos órfãos). Agora o boot chama `config/databaseSync.js` — que
+    existia desde sempre mas era **código morto, nenhum ficheiro o importava**
+    — e quem manda é o `.env`: `DB_SYNC=true` (cria o que falta) +
+    `DB_ALTER=false` (default novo; ligar pontualmente ao mudar schema,
+    desligar depois). Consequências de comportamento:
+    - `syncDatabase()` agora **relança** o erro em vez de engolir, pra manter o
+      que o boot já fazia antes: falha de schema não deixa o servidor subir.
+    - o guard `NODE_ENV === "production"` que já estava lá passa a valer de
+      fato — em produção o sync é pulado por completo, o que torna migrations
+      via `sequelize-cli` (já no `devDependencies`, nunca usado) o caminho
+      obrigatório pra qualquer go-live.
+    - efeito colateral: `databaseSync.js` é o único ficheiro que importa
+      `utils/logger.js`, que cria `backend/logs/` no import. Ou seja, o logger
+      também era código morto até agora e a pasta passa a ser criada em todo
+      boot (vazia, a menos que `LOG_TO_FILE=true`).
+  - **Validado só estaticamente** (dialeto carregado, cadeia de `require` dos
+    models) — Docker não está disponível neste ambiente, então nenhum boot
+    contra PostgreSQL real foi feito.
