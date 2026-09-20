@@ -170,17 +170,6 @@ Grade.belongsTo(Student, {
   as: "student",
 });
 
-// Student N - 1 Course
-Student.belongsTo(Course, {
-  foreignKey: "courseId",
-  as: "course",
-});
-
-Course.hasMany(Student, {
-  foreignKey: "courseId",
-  as: "students",
-});
-
 // Student 1 - N Fee
 Student.hasMany(Fee, {
   foreignKey: "studentId",
@@ -238,17 +227,6 @@ Grade.belongsTo(Subject, {
   ======================================================
 */
 
-// Course 1 - N Subject
-Course.hasMany(Subject, {
-  foreignKey: "courseId",
-  as: "subjects",
-});
-
-Subject.belongsTo(Course, {
-  foreignKey: "courseId",
-  as: "course",
-});
-
 /*
   ======================================================
   COURSE ↔ COURSE OFFERING
@@ -294,16 +272,6 @@ Teacher.hasMany(CourseOfferingSubject, {
 CourseOfferingSubject.belongsTo(Teacher, {
   foreignKey: "teacherId",
   as: "teacher",
-});
-
-Classroom.hasMany(CourseOfferingSubject, {
-  foreignKey: "classroomId",
-  as: "scheduledSubjects",
-});
-
-CourseOfferingSubject.belongsTo(Classroom, {
-  foreignKey: "classroomId",
-  as: "classroom",
 });
 
 CourseOfferingSubject.hasMany(Schedule, {
@@ -484,6 +452,25 @@ LogAudit.belongsTo(User, {
   ======================================================
   EXPORTS
   ======================================================
+*/
+
+/*
+  ASSOCIAÇÕES REMOVIDAS (nenhum controller as usava, nenhuma linha preenchida):
+
+  - Student ↔ Course (`Student.courseId`). O vínculo real de um aluno a um
+    curso é Enrollment -> CourseOffering -> Course. Já estava assinalada como
+    morta num comentário em controllers/student.controller.js.
+  - Course ↔ Subject (`Subject.courseId`). Redundante por desenho: uma
+    disciplina liga-se a um curso via CourseOfferingSubject, que é a relação
+    muitos-para-muitos de verdade.
+  - Classroom ↔ CourseOfferingSubject (`CourseOfferingSubject.classroomId`).
+    A sala pertence ao Schedule, não à disciplina: a mesma disciplina dá-se em
+    salas diferentes conforme o horário.
+
+  As três denunciavam-se pela coluna em camelCase (`"courseId"`,
+  `"classroomId"`): o foreignKey era declarado aqui sem o atributo
+  correspondente no modelo, e sem `field:` o Sequelize usa o nome tal e qual
+  como nome de coluna. Ver docs/project-rules.md, secção 5.
 */
 
 module.exports = {

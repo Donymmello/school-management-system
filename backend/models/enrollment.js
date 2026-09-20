@@ -30,7 +30,13 @@ const Enrollment = sequelize.define(
             field: "enrollment_date",
         },
 
-        aprovedBy: {
+        // Grafia com dois "p". Enquanto esteve "aprovedBy", o atributo declarado
+        // aqui não casava com o `foreignKey: "approvedBy"` da associação em
+        // models/index.js, e o Sequelize criava um SEGUNDO atributo por conta
+        // própria — com a coluna a chamar-se "approvedBy" tal e qual, por não
+        // ter `field:`. Resultado: duas colunas para o mesmo conceito, com o
+        // controller a escrever na inventada e esta a ficar sempre vazia.
+        approvedBy: {
             type: DataTypes.INTEGER,
             allowNull: true,
             field: "approved_by",
