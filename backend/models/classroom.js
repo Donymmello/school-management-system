@@ -14,19 +14,16 @@ const Classroom = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
       field: "school_id",
-      unique: ["classroom_school_code", "classroom_school_name"],
     },
 
     code: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      unique: "classroom_school_code",
     },
 
     name: {
       type: DataTypes.STRING(100),
       allowNull: false,
-      unique: "classroom_school_name",
     },
 
     block: {
@@ -54,6 +51,12 @@ const Classroom = sequelize.define(
   },
   {
     tableName: "classrooms",
+    // Mesmo raciocínio de models/subject.js: unicidade por escola, declarada
+    // em `indexes` porque school_id entra em duas constraints compostas.
+    indexes: [
+      { unique: true, name: "classroom_school_name", fields: ["school_id", "name"] },
+      { unique: true, name: "classroom_school_code", fields: ["school_id", "code"] },
+    ],
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at",

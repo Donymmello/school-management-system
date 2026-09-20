@@ -155,8 +155,10 @@ StudentAssessment, Grade, Attendance, Fee, AcademicPolicy).**
   pode ver todas as escolas ou filtrar via `?schoolId=`.
 - Helper `utils/tenantScope.js` (`tenantWhere`) usado em todas as queries de
   student/course/classroom/subject controllers, e no `create()` de cada um.
-- `classroom.code`/`classroom.name` e `subject.code` deixaram de ser únicos
-  globalmente e passaram a ser únicos por escola (`schoolId + code`).
+- `classroom.code`/`classroom.name` e `subject.code`/`subject.name` são únicos
+  **por escola** (`school_id + code`, `school_id + name`), declarados em
+  `indexes` no nível do modelo. Esta linha afirmou durante muito tempo que
+  assim era sem que fosse verdade — ver o bug abaixo.
 - `School` ganhou CRUD mínimo (`controllers/school.controller.js`,
   `routes/schools.routes.js`) — só `SUPER_ADMIN` cria/lista escolas.
 - `POST /api/auth/bootstrap-admin` agora cria o `SUPER_ADMIN` (dono da plataforma, sem
@@ -291,6 +293,53 @@ dimensão de isolamento *dentro* do que uma escola pode acessar, baseada em
   agora devolvem `academicModel` dentro de `user.school` — é como o frontend
   (`NavDrawer`, `RequireAuth`, `App.jsx`) decide esconder Cursos/Ofertas/
   Matrículas do menu e bloquear a rota pra escolas `SECONDARY`.
+
+**Bug real encontrado ao criar a segunda disciplina de uma escola, já contra
+PostgreSQL (`models/subject.js`, `models/classroom.js`):** a criação falhava
+com 409 `A record with this school_id already exists.` A causa era a
+declaração de unicidade na coluna `schoolId`:
+
+```js
+schoolId: { ..., unique: ["subject_school_code", "subject_school_name"] }
+```
+
+A forma em array **não existe** na API do Sequelize v6. A opção `unique` de um
+atributo aceita booleano, string (nome da constraint) ou objeto com `name`.
+Perante um array, o Sequelize testa `typeof === "string"` (falha), depois
+`typeof === "object" && tem .name` (um array também falha, `.name` é de
+funções, não de arrays) e cai no nome por omissão
+`${tableName}_${key}_unique`. Resultado: em vez das duas constraints compostas
+pretendidas, gerava **três constraints de coluna única**:
+
+| Gerado | Pretendido |
+| --- | --- |
+| `UNIQUE(school_id)` | `UNIQUE(school_id, name)` |
+| `UNIQUE(name)` — global | `UNIQUE(school_id, code)` |
+| `UNIQUE(code)` — global | |
+
+São dois bugs, não um. O `UNIQUE(school_id)` limitava cada escola a **uma
+única** disciplina (e uma única sala). E o `UNIQUE(name)`/`UNIQUE(code)` global
+é furo de isolamento entre inquilinos: a escola B não conseguiria criar uma
+"Matemática" porque a escola A já tinha uma.
+
+Corrigido movendo as constraints para `indexes` no nível do modelo, a única
+forma de exprimir uma coluna que participa em duas constraints compostas
+diferentes. `models/turma.js` e `models/course.js` já usavam o padrão certo (a
+mesma string em todas as colunas do grupo) e nunca estiveram afetados.
+
+**Por que só apareceu agora:** no MySQL a tabela `subjects` vinha de antes
+destas declarações existirem e o `alter` nunca reconciliou as constraints. O
+PostgreSQL criou a tabela do zero a partir da definição atual e materializou
+fielmente o que o modelo pedia. A migração não causou o bug — revelou-o. Vale
+como aviso geral: qualquer outra divergência entre o modelo e o schema legado
+do MySQL vai aparecer da mesma maneira, na primeira vez que a tabela nascer
+limpa.
+
+**Fica em aberto, decisão de negócio, não mexido:** `Course.code` e
+`CourseOffering.code` têm `unique: true`, ou seja, são únicos globalmente — se a
+escola A usar `ENG101`, a escola B não o pode usar. Pode ser intencional ou ser
+o mesmo descuido. `Fee.reference` também é global e esse parece correto: uma
+referência de pagamento não deve colidir entre escolas.
 
 **Pendências conhecidas:**
 

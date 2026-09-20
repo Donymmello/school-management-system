@@ -14,19 +14,16 @@ const Subject = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
       field: "school_id",
-      unique: ["subject_school_code", "subject_school_name"],
     },
 
     name: {
       type: DataTypes.STRING(150),
       allowNull: false,
-      unique: "subject_school_name",
     },
 
     code: {
       type: DataTypes.STRING(50),
       allowNull: true,
-      unique: "subject_school_code",
     },
 
     description: {
@@ -61,6 +58,15 @@ const Subject = sequelize.define(
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at",
+    // Unicidade é POR ESCOLA, nunca global: duas escolas podem ter ambas uma
+    // "Matemática". Tem de ser declarada aqui e não em `unique:` na coluna,
+    // porque a mesma coluna (school_id) participa em duas constraints
+    // compostas diferentes e a forma abreviada não sabe exprimir isso — ver
+    // docs/project-rules.md, secção 0.
+    indexes: [
+      { unique: true, name: "subject_school_name", fields: ["school_id", "name"] },
+      { unique: true, name: "subject_school_code", fields: ["school_id", "code"] },
+    ],
   }
 );
 
