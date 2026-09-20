@@ -12,6 +12,11 @@ node_modules
 /build
 /dist
 
+# dumps de base de dados (pg_dump) — nunca versionar: levam hashes de
+# palavras-passe, emails e o resto dos dados reais
+backup-*.sql
+*.dump
+
 # misc
 .DS_Store
 .env
