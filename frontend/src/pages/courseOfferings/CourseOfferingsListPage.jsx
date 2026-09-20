@@ -13,12 +13,15 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
+import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import CollectionsBookmarkOutlinedIcon from "@mui/icons-material/CollectionsBookmarkOutlined";
+import { Link as RouterLink } from "react-router-dom";
 import { deactivateCourseOffering, listCourseOfferings } from "../../api/courseOfferings.js";
 import { getErrorMessage } from "../../api/errors.js";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -115,14 +118,14 @@ export default function CourseOfferingsListPage() {
               <TableCell>Semestre</TableCell>
               <TableCell>Vagas</TableCell>
               <TableCell>Status</TableCell>
-              {canManage && <TableCell align="right">Ações</TableCell>}
+              <TableCell align="right">Ações</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {loading &&
               Array.from({ length: 4 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: canManage ? 7 : 6 }).map((__, j) => (
+                  {Array.from({ length: 7 }).map((__, j) => (
                     <TableCell key={j}>
                       <Skeleton />
                     </TableCell>
@@ -132,7 +135,7 @@ export default function CourseOfferingsListPage() {
 
             {!loading && offerings.length === 0 && !error && (
               <TableRow>
-                <TableCell colSpan={canManage ? 7 : 6}>
+                <TableCell colSpan={7}>
                   <Box textAlign="center" py={6} role="status">
                     <CollectionsBookmarkOutlinedIcon sx={{ fontSize: 40, color: "text.disabled" }} />
                     <Typography variant="subtitle1" sx={{ mt: 1 }}>
@@ -164,26 +167,38 @@ export default function CourseOfferingsListPage() {
                       variant="outlined"
                     />
                   </TableCell>
-                  {canManage && (
-                    <TableCell align="right">
+                  <TableCell align="right">
+                    <Tooltip title="Disciplinas">
                       <IconButton
-                        aria-label={`Editar oferta ${offering.code}`}
-                        onClick={() => openEdit(offering)}
+                        aria-label={`Disciplinas da oferta ${offering.code}`}
+                        component={RouterLink}
+                        to={`/ofertas/${offering.id}/disciplinas`}
                         size="small"
                       >
-                        <EditOutlinedIcon fontSize="small" />
+                        <MenuBookOutlinedIcon fontSize="small" />
                       </IconButton>
-                      {offering.active !== false && (
+                    </Tooltip>
+                    {canManage && (
+                      <>
                         <IconButton
-                          aria-label={`Desativar oferta ${offering.code}`}
-                          onClick={() => setDeactivatingOffering(offering)}
+                          aria-label={`Editar oferta ${offering.code}`}
+                          onClick={() => openEdit(offering)}
                           size="small"
                         >
-                          <BlockOutlinedIcon fontSize="small" />
+                          <EditOutlinedIcon fontSize="small" />
                         </IconButton>
-                      )}
-                    </TableCell>
-                  )}
+                        {offering.active !== false && (
+                          <IconButton
+                            aria-label={`Desativar oferta ${offering.code}`}
+                            onClick={() => setDeactivatingOffering(offering)}
+                            size="small"
+                          >
+                            <BlockOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        )}
+                      </>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
           </TableBody>

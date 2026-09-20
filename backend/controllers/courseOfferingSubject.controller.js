@@ -155,11 +155,21 @@ async function updateCourseOfferingSubject(req, res) {
             }
         }
 
+        // "?? item.x" só cai no valor antigo quando o campo vem undefined
+        // (omitido) — mas teacherId/startDate/endDate são legitimamente
+        // anuláveis (desatribuir professor, limpar uma data), e nesse caso
+        // o caller manda `null` de propósito. Como `null ?? x` retorna `x`
+        // (não `null`), isso fazia o campo nunca ser limpo: o frontend
+        // recebia 200 de sucesso mas o valor antigo continuava salvo.
+        // Bug pego em code review ao construir o CourseOfferingSubjectFormDialog
+        // (fase 5 do roadmap de execução) — é o primeiro caller a mandar
+        // null de propósito pra esses campos. Corrigido checando presença
+        // da chave no body em vez de usar "??".
         await item.update({
-            teacherId: teacherId ?? item.teacherId,
+            teacherId: "teacherId" in req.body ? teacherId : item.teacherId,
             weeklyHours: weeklyHours ?? item.weeklyHours,
-            startDate: startDate ?? item.startDate,
-            endDate: endDate ?? item.endDate,
+            startDate: "startDate" in req.body ? startDate : item.startDate,
+            endDate: "endDate" in req.body ? endDate : item.endDate,
             status: status ?? item.status,
         });
 

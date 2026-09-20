@@ -19,3 +19,16 @@ export async function changePassword(currentPassword, newPassword) {
   const { data } = await apiClient.patch("/auth/change-password", { currentPassword, newPassword });
   return data;
 }
+
+// "Esqueci minha senha" — pra quem perdeu acesso (diferente de
+// changePassword, que exige estar logado com a senha atual). Resposta do
+// backend é sempre a mesma genérica, exista o email ou não.
+export async function forgotPassword(email) {
+  const { data } = await apiClient.post("/auth/forgot-password", { email });
+  return data;
+}
+
+export async function resetPassword(token, password) {
+  const { data } = await apiClient.post("/auth/reset-password", { token, password });
+  return data;
+}

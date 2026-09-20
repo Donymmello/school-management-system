@@ -54,7 +54,7 @@ export default function ClassroomsListPage() {
     try {
       setClassrooms(await listClassrooms());
     } catch (err) {
-      setError(getErrorMessage(err, "Não foi possível carregar as turmas."));
+      setError(getErrorMessage(err, "Não foi possível carregar as salas."));
     } finally {
       setLoading(false);
     }
@@ -86,7 +86,7 @@ export default function ClassroomsListPage() {
       setDeletingClassroom(null);
       load();
     } catch (err) {
-      setError(getErrorMessage(err, "Não foi possível excluir a turma."));
+      setError(getErrorMessage(err, "Não foi possível excluir a sala."));
       setDeletingClassroom(null);
     } finally {
       setDeleting(false);
@@ -97,11 +97,11 @@ export default function ClassroomsListPage() {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} gap={2}>
         <Typography variant="h4" component="h1">
-          Turmas
+          Salas
         </Typography>
         {canManage && (
           <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
-            Nova turma
+            Nova sala
           </Button>
         )}
       </Box>
@@ -113,7 +113,7 @@ export default function ClassroomsListPage() {
       )}
 
       <TableContainer component={Paper}>
-        <Table aria-label="Lista de turmas">
+        <Table aria-label="Lista de salas">
           <TableHead>
             <TableRow>
               <TableCell>Código</TableCell>
@@ -143,11 +143,11 @@ export default function ClassroomsListPage() {
                   <Box textAlign="center" py={6} role="status">
                     <MeetingRoomOutlinedIcon sx={{ fontSize: 40, color: "text.disabled" }} />
                     <Typography variant="subtitle1" sx={{ mt: 1 }}>
-                      Nenhuma turma cadastrada
+                      Nenhuma sala cadastrada
                     </Typography>
                     {canManage && (
                       <Typography variant="body2" color="text.secondary">
-                        Clique em "Nova turma" para cadastrar a primeira.
+                        Clique em "Nova sala" para cadastrar a primeira.
                       </Typography>
                     )}
                   </Box>
@@ -204,7 +204,7 @@ export default function ClassroomsListPage() {
 
       <ConfirmDialog
         open={Boolean(deletingClassroom)}
-        title="Excluir turma"
+        title="Excluir sala"
         description={`Tem certeza que deseja excluir ${deletingClassroom?.name}? Essa ação não pode ser desfeita.`}
         confirmLabel="Excluir"
         confirmColor="error"

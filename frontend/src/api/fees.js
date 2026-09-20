@@ -20,6 +20,14 @@ export async function markFeeStatus(id, status) {
   return data;
 }
 
+// Fase 8: propinas atrasadas + a vencer nos próximos `days` dias (default
+// 7 no backend), agrupadas por aluno com entidade/referência de cada
+// propina e totais por moeda.
+export async function getFeeAlerts(days) {
+  const { data } = await apiClient.get("/fees/alerts", { params: days ? { days } : undefined });
+  return data;
+}
+
 export async function deleteFee(id) {
   const { data } = await apiClient.delete(`/fees/${id}`);
   return data;

@@ -63,7 +63,7 @@ export default function ClassroomFormDialog({ open, classroom, onClose, onSaved 
       else await createClassroom(payload);
       onSaved();
     } catch (err) {
-      setError(getErrorMessage(err, "Não foi possível salvar a turma."));
+      setError(getErrorMessage(err, "Não foi possível salvar a sala."));
     } finally {
       setSubmitting(false);
     }
@@ -71,7 +71,7 @@ export default function ClassroomFormDialog({ open, classroom, onClose, onSaved 
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{isEditing ? "Editar turma" : "Nova turma"}</DialogTitle>
+      <DialogTitle>{isEditing ? "Editar sala" : "Nova sala"}</DialogTitle>
       <Box component="form" onSubmit={handleSubmit}>
         <DialogContent>
           {error && (

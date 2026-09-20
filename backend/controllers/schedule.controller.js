@@ -3,22 +3,46 @@ const {
     CourseOfferingSubject,
     Classroom,
     Subject,
+    Teacher,
+    Enrollment,
 } = require('../models');
 
 const { Op } = require('sequelize');
 const { tenantWhere } = require('../utils/tenantScope');
+const { resolveOwnStudentId } = require('../utils/selfScope');
 
 // Schedule não tem schoolId próprio (ver docs/project-rules.md, seção 5) — o
 // isolamento por escola é feito via join obrigatório em
 // CourseOfferingSubject -> Subject (subjectId nunca é nulo; classroomId é
-// opcional, por isso não dá pra confiar só nele).
-function courseOfferingSubjectScope(req) {
+// opcional, por isso não dá pra confiar só nele). `courseOfferingIds`
+// (opcional) restringe ainda mais, pro auto-escopo de STUDENT (Fase 9a) —
+// ver studentCourseOfferingIds() abaixo.
+function courseOfferingSubjectScope(req, courseOfferingIds) {
     return {
         model: CourseOfferingSubject,
         as: "courseOfferingSubject",
         required: true,
-        include: [{ model: Subject, as: "subject", required: true, where: tenantWhere(req) }],
+        where: courseOfferingIds ? { courseOfferingId: { [Op.in]: courseOfferingIds } } : undefined,
+        include: [
+            { model: Subject, as: "subject", required: true, where: tenantWhere(req) },
+            { model: Teacher, as: "teacher", attributes: ["id", "name"], required: false },
+        ],
     };
+}
+
+// Fase 9a ("Meu horário"): um STUDENT só deve ver o horário das disciplinas
+// das ofertas em que está matriculado de fato (status APPROVED — PENDING/
+// REJECTED/CANCELLED não dão acesso à disciplina). Devolve a lista de
+// courseOfferingId, ou [] se não tiver nenhuma matrícula aprovada (nunca
+// null/undefined, pra sempre poder usar com Op.in sem checagem extra).
+async function studentCourseOfferingIds(req) {
+    const ownStudentId = await resolveOwnStudentId(req);
+    if (!ownStudentId) return [];
+    const enrollments = await Enrollment.findAll({
+        where: { studentId: ownStudentId, status: "APPROVED" },
+        attributes: ["courseOfferingId"],
+    });
+    return enrollments.map((e) => e.courseOfferingId);
 }
 
 async function createSchedule(req, res) {
@@ -115,9 +139,20 @@ async function createSchedule(req, res) {
 
 async function getAllSchedules(req, res) {
     try {
+        // Fase 9a: STUDENT só vê o próprio horário (matrículas aprovadas),
+        // não a escola inteira — antes essa rota devolvia tudo pra
+        // qualquer papel autorizado, incluindo STUDENT (achado ao construir
+        // "Meu horário", ver docs/project-rules.md, seção 6).
+        let courseOfferingIds;
+        if (req.user.role === "STUDENT") {
+            courseOfferingIds = await studentCourseOfferingIds(req);
+            if (courseOfferingIds.length === 0) return res.status(200).json([]);
+        }
+
         const schedules = await Schedule.findAll({
+            where: req.user.role === "STUDENT" ? { status: "ACTIVE" } : undefined,
             include: [
-                courseOfferingSubjectScope(req),
+                courseOfferingSubjectScope(req, courseOfferingIds),
                 { association: "classroom" },
             ],
         });
@@ -134,10 +169,16 @@ async function getAllSchedules(req, res) {
 
 async function getScheduleById(req, res) {
     try {
+        let courseOfferingIds;
+        if (req.user.role === "STUDENT") {
+            courseOfferingIds = await studentCourseOfferingIds(req);
+            if (courseOfferingIds.length === 0) return res.status(404).json({ message: "Schedule not found" });
+        }
+
         const schedule = await Schedule.findOne({
             where: { id: req.params.id },
             include: [
-                courseOfferingSubjectScope(req),
+                courseOfferingSubjectScope(req, courseOfferingIds),
                 { association: "classroom" },
             ],
         });

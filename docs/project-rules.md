@@ -164,6 +164,21 @@ StudentAssessment, Grade, Attendance, Fee, AcademicPolicy).**
   (que deve informar `schoolId` no body) ou `ADMIN` (herda a própria escola). `POST
   /api/auth/register-student` (rota pública) agora exige `schoolId` no body.
 
+**Bug de segurança real encontrado e corrigido numa auditoria do fluxo de
+autenticação (`auth.controller.js login()`):** os checks de `user.active` e
+`school.status !== "ACTIVE"` rodavam **antes** da validação da senha
+(`bcrypt.compare`). Na prática, isso significava que qualquer pessoa — sem
+saber a senha, só o email — conseguia descobrir via `POST /auth/login` se
+aquele email pertence a uma conta desativada (403 "User is inactive") ou a
+uma escola suspensa (403 "school not active"), porque esses 403 chegavam
+antes de qualquer validação de credencial. Um oracle de enumeração de
+contas clássico. Corrigido invertendo a ordem: senha primeiro (401
+genérico se errada), status da conta/escola só depois de confirmar que a
+senha está certa. O 404 "User not found" pra email inexistente continua
+antes da senha (inevitável — sem usuário não tem hash pra comparar), mas
+esse é um padrão bem mais comum/aceito do que revelar o status interno de
+uma conta que existe.
+
 **Controllers que estavam vazios/quebrados, agora implementados:**
 
 - `teacher.controller.js` e `staff.controller.js` — estavam vazios (Staff nem
@@ -396,6 +411,126 @@ Ordem sugerida, do que destrava o quê:
      vira "Minhas notas"/"Minha frequência"/"Minhas matrículas". Menu lateral
      e rotas liberados pro STUDENT nos três.
 
+   **"Meu horário" — feito (Fase 9a do roadmap de execução).** O aluno
+   apontou (com razão) que faltava ver horário, além de faltas/notas já
+   existirem. Duas partes bem diferentes de tamanho:
+   - **HIGHER_ED — bug de isolamento corrigido.** `Schedule` já existia
+     (Fase 5) e `GET /schedules` já listava STUDENT nos papéis permitidos,
+     mas **sem nenhum auto-escopo** — um aluno conseguia ver o horário de
+     disciplinas de ofertas em que nem estava matriculado, bastava a rota
+     estar liberada pro papel (mesma classe de bug já corrigida antes em
+     `getAllGrades`/`getAllAttendance`, mas que passou batido aqui porque
+     `Schedule` nunca tinha sido exposto de fato pro aluno). Corrigido:
+     `getAllSchedules`/`getScheduleById` agora filtram pelas
+     `courseOfferingId` das matrículas com `status: "APPROVED"` do próprio
+     aluno (via `Enrollment`) — mesmo aluno sem matrícula aprovada nenhuma
+     recebe `[]`/404 em vez do horário da escola inteira. De quebra, o
+     include ganhou o professor (`Teacher`) — antes só trazia a disciplina,
+     sem dizer quem leciona.
+   - **SECONDARY — conceito novo do zero.** `Turma`/`TurmaSubject` (Fase 6)
+     não tinham nenhuma noção de dia/hora. Novo model `TurmaSchedule`
+     (`backend/models/turmaSchedule.js`) espelhando `Schedule`, criado como
+     entidade paralela em vez de reaproveitar `Schedule` com um segundo FK
+     opcional — mesmo padrão já usado em Turma/TurmaSubject vs.
+     Classroom/CourseOfferingSubject na Fase 6, evita FK mutuamente
+     exclusivo e não arrisca a lógica de conflito de sala do HIGHER_ED já
+     em produção. Rotas `/api/turma-schedules`, gated
+     `requireAcademicModel("SECONDARY")`, com o mesmo auto-escopo por
+     matrícula (aqui, pela `Turma` do aluno via `Student.turmaId`) desde o
+     início — não precisou de um fix separado depois. Conflito de sala
+     checado só dentro de `TurmaSchedule` (uma escola opera num único
+     `academicModel`, então as salas dela nunca são usadas por `Schedule` e
+     `TurmaSchedule` ao mesmo tempo).
+   - **Frontend:** `/meu-horario` (`MySchedulePage`, só STUDENT) — mesma
+     tela pros dois modelos, troca só a API de origem conforme
+     `school.academicModel`, normaliza os dois formatos de resposta pra um
+     shape só, agrupado por dia da semana. Gestão de horário pro lado
+     SECONDARY ganhou `TurmaScheduleManagerDialog` (espelha
+     `ScheduleManagerDialog` do HIGHER_ED), acessível a partir de
+     `TurmaSubjectsPage` (ícone "Horário" por disciplina da turma).
+   - **Validado só estaticamente** (sintaxe, cadeia de `require`, boot do
+     `server.js`, `vite build` — 1099 módulos) — sem MySQL/Docker disponível
+     neste ambiente, o auto-escopo por matrícula/turma e a checagem de
+     conflito de sala não foram testados contra dado real.
+
+   **Faltas com resumo — feito (Fase 9b do roadmap de execução).**
+   `AttendanceListPage` (`readOnly`/STUDENT) ganhou um card de resumo acima
+   da lista crua que já existia: contagem por status (Presente/Ausente/
+   Atrasado/Falta justificada) e uma taxa de presença (`Presente + Atrasado`
+   sobre o total de registros — falta justificada conta como ausência pra
+   esse cálculo, é uma ausência com motivo aceito, não presença de fato).
+   **Sem endpoint novo no backend** — o dado já vinha completo e
+   auto-escopado do `GET /attendance` existente (Portal do Aluno, seção 6
+   item 5); o resumo é só `useMemo` em cima do que já chegava. Só aparece
+   pro papel STUDENT: pra staff a tabela mistura vários alunos, um % só
+   faria sentido filtrado por aluno, o que a tela atual não faz. Validado
+   via `vite build` (1099 módulos).
+
+   **Meu plano de estudos — feito (Fase 9c do roadmap de execução).** Novo
+   `GET /api/students/me/study-plan` (`student.controller.js
+   getMyStudyPlan`, só STUDENT). O dado já existia, só não estava exposto:
+   - **HIGHER_ED:** achado interessante ao construir isso — existe uma
+     associação `Student.belongsTo(Course, { foreignKey: "courseId" })` no
+     `models/index.js`, mas **nenhum controller do sistema jamais escreve
+     nesse campo** (busquei "courseId" em todos os controllers — só aparece
+     em `courseOffering.controller.js`, que é um campo diferente, da
+     `CourseOffering`). Ou seja, essa associação é morta na prática. A
+     fonte real de "quais disciplinas são minhas" é `Enrollment` (só
+     `status: "APPROVED"`) → `CourseOffering` → `CourseOfferingSubject` →
+     `Subject`/`Teacher` — o mesmo caminho que `EnrollmentsListPage` já
+     usava, só que agora também trazendo as disciplinas de cada oferta.
+   - **SECONDARY:** `Student.turmaId` → `TurmaSubject` → `Subject`/
+     `Teacher`, já existente desde a Fase 6.
+   - Resposta normalizada num shape só (`subjectName`/`teacherName`/
+     `weeklyHours`/`context`) pro frontend não precisar dos dois formatos.
+     Frontend: `/meu-plano-de-estudos` (`StudyPlanPage`, só STUDENT) — uma
+     tabela simples, sem agrupamento por período/oferta (não pedido).
+   - **Deliberadamente não é um "plano" no sentido de currículo formal**
+     (quais disciplinas o aluno *deveria* cursar pra se formar, quantas já
+     completou, o que falta) — é só "quais disciplinas fazem parte da
+     minha matrícula/turma hoje". Um currículo formal exigiria um novo
+     conceito (`Curriculum`/requisitos por curso ou série) que não existe
+     em nenhum lugar do sistema — não pedido nesta fase.
+   - **Validado só estaticamente** (sintaxe, cadeia de `require`, boot do
+     `server.js`, `vite build` — 1102 módulos) — sem MySQL/Docker
+     disponível neste ambiente.
+
+   **Minha situação curricular — feito (Fase 9d do roadmap de execução),
+   escopo reduzido a pedido do usuário: aprovado/reprovado formal só pro
+   HIGHER_ED.**
+   - **Bug de isolamento real corrigido de quebra, achado ao construir
+     isso:** `GET /results/:enrollmentId/:courseOfferingSubjectId`
+     (`gradeCalculation.service.js calculateStudentResult`) já liberava
+     STUDENT em `authorizeRoles` desde a Fase 5, mas **nada verificava se a
+     matrícula (`enrollmentId`) era do próprio aluno** — bastava trocar o
+     número na URL pra ver a nota/resultado de qualquer colega da mesma
+     escola. Mesma classe de bug já corrigida em `Schedule` na Fase 9a,
+     mas essa aqui tinha passado despercebida porque a rota nunca tinha
+     sido de fato exposta pro aluno antes (só usada pelo staff via
+     `ResultadoFinalPanel`). Corrigido: quando quem chama é STUDENT, checa
+     `enrollment.studentId` contra o próprio id (via `resolveOwnStudentId`)
+     antes de calcular qualquer coisa — 404 genérico se não bater, pra não
+     confirmar que a matrícula de outro aluno existe.
+   - Novo `GET /api/students/me/academic-status`
+     (`student.controller.js getMyAcademicStatus`, só STUDENT):
+     - **HIGHER_ED:** reaproveita `calculateStudentResult` (o mesmo cálculo
+       de aprovado/reprovado via `AcademicPolicy` que o staff já usava) pra
+       cada disciplina de cada oferta com matrícula `APPROVED`. Se a escola
+       não tiver uma `AcademicPolicy` ativa (o cálculo lança 404 nesse
+       caso), o item entra marcado `unavailable: true` em vez de derrubar a
+       lista inteira.
+     - **SECONDARY:** sem critério de aprovação modelado (decisão do
+       usuário: fora de escopo desta fase) — calcula só a média simples
+       por disciplina a partir de `Grade`, sem aprovado/reprovado.
+   - Frontend: `/minha-situacao-curricular` (`AcademicStatusPage`, só
+     STUDENT) — tabela com nota contínua/exame/final/situação pro
+     HIGHER_ED, tabela mais simples com média/quantidade de notas pro
+     SECONDARY (com aviso explícito de que não há aprovado/reprovado
+     formal ainda).
+   - **Validado só estaticamente** (sintaxe, cadeia de `require`, boot do
+     `server.js`, `vite build` — 1103 módulos) — sem MySQL/Docker
+     disponível neste ambiente.
+
    **Portal do Professor — ainda bloqueado.** A ideia (turmas/disciplinas que
    o professor leciona via `CourseOfferingSubject.teacherId`, lançar
    nota/frequência só dos seus alunos) esbarra em duas coisas: (1) não existe
@@ -471,10 +606,13 @@ Ordem sugerida, do que destrava o quê:
      (`status === PENDING && dueDate < hoje`), não persistido — evita dado
      parado mentir depois que o relógio passa do vencimento. Ver
      `isOverdue()` em `frontend/src/pages/fees/FeesListPage.jsx`.
-   - `School.currency` (default `"AOA"`, editável por ADMIN/SUPER_ADMIN em
-     `SchoolFormDialog`) — cada `Fee` copia esse valor no momento da
-     criação (não é FK vivo); trocar a moeda da escola depois não altera
-     lançamentos antigos.
+   - `School.currency` (default `"MZN"` — Metical, mercado principal do
+     sistema é Moçambique; corrigido de `"AOA"`, que era o default errado
+     antes — ver seção 6, fase 8; editável por ADMIN/SUPER_ADMIN em
+     `SchoolFormDialog`/`SchoolSettingsPage`) — cada `Fee` copia esse valor
+     no momento da criação (não é FK vivo); trocar a moeda da escola depois
+     não altera lançamentos antigos. Campo é texto livre (até 3 letras),
+     não uma lista fixa — aceita qualquer moeda, `MZN` é só o default.
    - Vínculo em `Student` (não `Enrollment`) de propósito — `Enrollment` só
      existe pra `HIGHER_ED`; `Student` cobre os dois `academicModel`.
    - Sem gateway de pagamento — pagamento acontece fora do sistema, STAFF só
@@ -487,6 +625,329 @@ Ordem sugerida, do que destrava o quê:
    - Frontend: `/propinas` — `FeesListPage`/`FeeFormDialog`, com toggle
      pago/pendente inline; título e colunas mudam pra "Minhas propinas"
      somente-leitura quando `STUDENT`.
+
+6. **Portais/telas que faltam terminar (backend pronto, frontend não) — sem ordem
+   de prioridade definida ainda:**
+   - ~~**Tela de criar Staff.**~~ **Feito (Fase 1 do roadmap de execução).**
+     `StaffListPage`/`StaffFormDialog` (`/staff`), criação via
+     `POST /auth/register-user` (role `STAFF`), mesmo padrão de
+     Teacher/Student. Visível no menu pra `SUPER_ADMIN/ADMIN/DIRECTOR/STAFF`
+     (espelha `staff.routes.js`); criar de fato continua restrito a
+     `ADMIN/SUPER_ADMIN` no backend, mesma limitação de frontend que já
+     existia em Professores (botão aparece, backend rejeita com 403 se o
+     papel não puder).
+   - ~~**Log de auditoria — tela de consulta.**~~ **Feito (Fase 1).**
+     `AuditLogListPage` (`/auditoria`), visível pra qualquer papel logado:
+     `ADMIN/SUPER_ADMIN` veem `GET /logs-audit` (log completo, agora
+     corretamente restrito à própria escola — ver bug abaixo), os demais
+     papéis veem só `GET /logs-audit/meus` (as próprias ações).
+     **Dois bugs reais pegos ao construir esta tela, corrigidos:**
+     1. `logAudit.controller.js` incluía `User` com `attributes: ["nome",
+        "ativo", ...]` — esses campos não existem no model (`name`/`active`
+        em inglês, não em português); qualquer chamada a `GET /logs-audit`
+        ou `/logs-audit/:id` quebrava com `SequelizeDatabaseError`.
+        Endpoint nunca tinha sido consumido por nenhum frontend antes, por
+        isso passou despercebido.
+     2. **Isolamento multi-tenant quebrado:** `GET /logs-audit` não tinha
+        `requireSchool` nem nenhum filtro por escola — um `ADMIN` de
+        qualquer escola conseguia ver logs de auditoria de **todas** as
+        escolas do sistema (o model `LogAudit` não tem `schoolId` próprio,
+        só chega lá via `User.schoolId`). Corrigido: rotas `GET /` e
+        `GET /:id` ganharam `requireSchool`, e o controller agora filtra via
+        inner join no `User` (`where: { schoolId: req.schoolId }`) quando
+        quem pede não é `SUPER_ADMIN` sem filtro.
+   - **Portal do Professor.** Bloqueado até existir (a) uma tela administrativa
+     de `CourseOfferingSubject` (atribuir professor↔disciplina↔oferta) e (b),
+     pra `SECONDARY`, uma relação real professor↔turma↔disciplina no modelo de
+     dado — hoje `Teacher.subject` é só texto livre. Ver seção 6, item 5.
+   - ~~**Ofertas→Disciplinas (`CourseOfferingSubject`), Horário (`Schedule`),
+     Avaliações (`Assessment`/`StudentAssessment`) e Resultado final.**~~
+     **Feito (Fase 5 do roadmap de execução).** Fluxo: `/ofertas` → botão
+     "Disciplinas" → `/ofertas/:offeringId/disciplinas`
+     (`CourseOfferingSubjectsPage`, atribui disciplina+professor+carga
+     horária à oferta) → por disciplina, ícone "Horário" abre
+     `ScheduleManagerDialog` (dia/hora/sala, com checagem de conflito de
+     sala já existente no backend) e ícone "Avaliações" leva a
+     `/ofertas/:offeringId/disciplinas/:cosId/avaliacoes`
+     (`AssessmentsPage`: cria avaliações com categoria CONTINUOUS/EXAM,
+     `ScoresDialog` lança/lista notas por avaliação, `ResultadoFinalPanel`
+     calcula o resultado agregado via `GET /results/:enrollmentId/:cosId`).
+     Restrito a `SUPER_ADMIN/ADMIN/STAFF/DIRECTOR/TEACHER` (mesmos papéis de
+     `/ofertas`) — `STUDENT` não ganhou acesso a essas telas nesta rodada
+     (não pedido, e a UI é toda de gestão/lançamento, não de consulta).
+     **Antes de construir as telas, o backend tinha 3 lacunas reais que
+     precisaram ser fechadas primeiro** (decisão explícita do usuário:
+     "completar o backend primeiro"):
+     1. `POST /assessments` não aceitava `category` no body — toda
+        avaliação criada caía no default `CONTINUOUS`, o que tornava
+        impossível registrar uma avaliação de `EXAM` e, por consequência,
+        o cálculo de resultado final nunca encontrava `examScore`.
+     2. `Assessment` não tinha `GET /:id`, `PUT /:id` nem `DELETE /:id` —
+        só criar e listar. Adicionados os três (`DELETE` bloqueia com 409
+        se a avaliação já tiver notas lançadas, evitando um
+        `SequelizeForeignKeyConstraintError` cru).
+     3. `StudentAssessment` não tinha **nenhum** `GET` — impossível saber
+        quem já tinha nota lançada numa avaliação sem consultar o banco
+        direto. Adicionado `GET /student-assessments?assessmentId=` (ou
+        `?enrollmentId=`), com o mesmo auto-escopo de portal do aluno que
+        `Grades`/`Attendance`/`Fees` já tinham (`STUDENT` só vê as
+        próprias notas, mesmo se tentar passar outro `enrollmentId`).
+     **Dois bugs pequenos corrigidos de quebra** enquanto completava esse
+     backend: `recordScore` validava só o teto da nota (`score >
+     maxScore`), nada impedia `score` negativo; e `Assessment.sum("weight")`
+     no `updateAssessment` agora exclui a própria avaliação da soma (senão
+     editar o peso de uma avaliação existente contaria o peso antigo e o
+     novo ao mesmo tempo).
+     **Simplificação deliberada:** `GET /course-offering-subjects` e
+     `GET /schedules` não filtram por oferta/disciplina no backend
+     (devolvem tudo da escola) — o frontend filtra no cliente. Ok pro
+     volume de dados esperado por escola; se isso crescer muito, vale
+     mover o filtro pro backend.
+     **Validado só estaticamente** (sintaxe, cadeia de `require`, boot do
+     `server.js`, `vite build`) — os fluxos de criar avaliação EXAM,
+     lançar nota e calcular resultado final (que depende de uma
+     `AcademicPolicy` ativa já existir na escola) não foram testados
+     contra dado real neste ambiente.
+     **Code review feito nesta rodada (`code-review-and-quality`) encontrou
+     3 problemas Required, todos corrigidos:**
+     1. `courseOfferingSubject.controller.js`, `updateCourseOfferingSubject`
+        (código pré-existente de rodada anterior) usava `campo ?? item.campo`
+        pra `teacherId`/`startDate`/`endDate` — como `null ?? x` retorna `x`
+        (não `null`), limpar o professor ou uma data no
+        `CourseOfferingSubjectFormDialog` novo desta rodada dava 200 de
+        sucesso mas não salvava a mudança. Corrigido checando presença da
+        chave no `req.body` em vez de `??`.
+     2. `assessment.controller.js` validava `weight`/`maxScore` com
+        `Number(x)` cru — um valor não-numérico virava `NaN`, e
+        `NaN > 100` é sempre `false`, furando o guard de "peso não pode
+        passar de 100%" e só quebrando depois com erro de banco cru.
+        Corrigido com `validatePositiveNumber()`, extraído de
+        `validateAmount()` em `utils/validators.js` (reuso do helper
+        canônico em vez de duplicar a checagem).
+     3. `ScheduleManagerDialog` e `ScoresDialog` não escondiam o
+        formulário de criar/editar conforme o papel — `DIRECTOR`/`TEACHER`
+        (que têm acesso de leitura a essas telas) viam o formulário sempre
+        ativo e só descobriam que não podiam salvar via 403. Corrigido
+        espelhando os `authorizeRoles` de cada rota (mesmo padrão já usado
+        em `StaffListPage`/`TeachersListPage`).
+   - ~~**Esqueci minha senha — falta só ligar o fio.**~~ **Feito (Fase 3 do
+     roadmap de execução).** `forgotPassword` agora chama `sendEmail()`
+     (`utils/email.js`, nodemailer/Gmail) de verdade, com o link de reset
+     (`FRONTEND_URL` + `/redefinir-senha?token=...`, `FRONTEND_URL` novo em
+     `backend/.env`, default `http://localhost:5173` se não setado). Se o
+     envio falhar (ex: `EMAIL_USER`/`EMAIL_PASS` vazios — placeholders
+     adicionados no `.env`, sem valor real ainda), cai pro `console.log` de
+     dev que já existia, sem quebrar o pedido — resposta pro cliente
+     continua sempre a mesma genérica, exista o email ou não. Frontend:
+     `ForgotPasswordPage` (`/esqueci-senha`, pede o email) e
+     `ResetPasswordPage` (`/redefinir-senha`, cola token + nova senha, lê o
+     token da URL se vier no link do email), link "Esqueci minha senha" na
+     `LoginPage`. `resetPassword` ganhou log de auditoria (`UPDATE User`),
+     mesmo padrão do `changePassword` self-service.
+     **Bug pego de quebra:** `registerLogAudit()` aceitava um segundo
+     argumento `{ transaction }` em três call sites (`registerUser`,
+     `registerStudent`, e agora `resetPassword`) mas nunca usava — o
+     `LogAudit.create()` sempre rodava fora da transaction do caller,
+     mesmo passando a intenção explícita. Corrigido em `utils/logAudit.js`
+     pra de fato repassar a `transaction` quando informada. `email.routes.js`
+     continua arquivo morto (só imports, sem `module.exports`, nem montado
+     em `server.js`) — não usar, é lixo do protótipo antigo.
+     **Não testado com envio de email real** (sem `EMAIL_USER`/`EMAIL_PASS`
+     configurados neste ambiente) — só validado estaticamente + o
+     fallback de `console.log`. Preencher as credenciais Gmail reais em
+     `backend/.env` e testar o envio de fato antes de confiar nisso em
+     produção.
+
+7. **Funcionalidades que ainda não existem de nenhuma forma (nem backend) —
+   levantadas numa análise do sistema, sem pedido de cliente ainda:**
+   - **Upload de arquivo.** `School.logo` existe no model e não tem endpoint de
+     upload nem campo no formulário — só dá pra "trocar o logo" colando uma URL
+     direto na API. Existe uma pasta `backend/upload/` vazia, provavelmente
+     resquício do protótipo antigo, sem middleware (`multer` ou equivalente)
+     configurado.
+   - ~~**Painel com números (KPIs).**~~ **Feito (Fase 2 do roadmap de
+     execução).** Novo endpoint `GET /api/dashboard/summary`
+     (`backend/controllers/dashboard.controller.js`), restrito a
+     `SUPER_ADMIN/ADMIN/DIRECTOR/STAFF` — TEACHER/STUDENT continuam sem KPIs
+     agregados por enquanto (não há "meu resumo" óbvio pra eles ainda sem
+     turma/disciplina modelada de verdade, ver item 7 abaixo). Dois modos:
+     - **`SUPER_ADMIN` sem `?schoolId=`** (visão de plataforma): total de
+       escolas, escolas ativas/inativas, alunos e professores somados de
+       todas as escolas.
+     - **Escola específica** (qualquer outro papel, ou `SUPER_ADMIN` com
+       `?schoolId=`): total de alunos/professores/staff, propinas
+       pendentes, propinas em atraso (`status=PENDING` e `dueDate` no
+       passado, agrupado por moeda — uma escola pode ter lançamentos
+       antigos em moeda diferente da atual, ver seção 6 item 5), e
+       matrículas pendentes (só se `academicModel === "HIGHER_ED"`, senão
+       `null`).
+     Frontend: `DashboardHome` ganhou uma grade de cartões
+     (`KpiCard`/`KpiGrid`) acima do cartão de perfil, visível só pros
+     mesmos papéis que o backend autoriza.
+     **Validado só estaticamente** (sintaxe, cadeia de `require`, boot do
+     `server.js`, `vite build`) — a query agregada de propinas em atraso
+     (`GROUP BY currency` com `JOIN` em `Student`) foi sinalizada como a
+     parte mais arriscada desta rodada por não ter sido testada contra dado
+     real neste ambiente (sem MySQL/SQLite disponível).
+     **Bug real confirmado contra MySQL de verdade (rodando em produção
+     local via Docker) e corrigido:** `Fee.count(...)` funcionou, mas
+     `Fee.findAll(...)` quebrava com `Unknown column 'fees.id' in 'field
+     list'`. Causa: `col("fees.id")`/`col("fees.amount")` qualificavam a
+     coluna com o **nome da tabela** (`fees`, minúsculo/plural), mas o
+     Sequelize aliasa a tabela com o **nome do model** na query gerada
+     (`FROM \`fees\` AS \`Fee\``) — então `fees.id` não batia com nenhum
+     alias existente e o MySQL rejeitava. Corrigido pra `col("Fee.id")`/
+     `col("Fee.amount")`, qualificando com o alias real (`Fee`, maiúsculo).
+     Isso confirma a suspeita registrada aqui antes: essa era mesmo a parte
+     mais arriscada do KPI, e só quebrou ao rodar contra MySQL real — os
+     checks estáticos deste ambiente (sintaxe, boot do `server.js`) não
+     executam a query, então não pegam esse tipo de erro.
+   - **Exportação/impressão.** Sem boletim em PDF, sem recibo de propina, sem
+     exportar lista de alunos/propinas pra Excel/CSV — nenhuma lib desse tipo
+     está instalada em nenhum dos dois `package.json`.
+   - ~~**Turma pedagógica de verdade pra `SECONDARY`.**~~ **Feito em parte
+     (Fase 6 do roadmap de execução — escopo reduzido a pedido do usuário:
+     "Só Turma pedagógica", sem Ano letivo/Período formal, ver item abaixo).**
+     Novo model `Turma` (`backend/models/turma.js`): nome (único por escola),
+     série, sala principal (`classroomId`, FK opcional pra `Classroom` — sala
+     física, ver renomeação abaixo), ano letivo (**texto livre**, sem entidade
+     formal), ativo/inativo. Novo model `TurmaSubject`
+     (`backend/models/turmaSubject.js`): liga `Turma`+`Subject`+`Teacher`
+     (opcional)+carga horária semanal, único por par turma+disciplina.
+     `Student` ganhou `turmaId` (nullable, aditivo — não mexe no `grade` texto
+     livre que já existia). Rotas `/api/turmas` e `/api/turma-subjects`,
+     ambas gated por `requireAcademicModel("SECONDARY")` (primeiro uso desse
+     middleware pro lado `SECONDARY`; até então só existia pra `HIGHER_ED`).
+     Frontend: `/turmas` (`TurmasListPage`, CRUD) → ícone "Disciplinas" leva a
+     `/turmas/:turmaId/disciplinas` (`TurmaSubjectsPage`, atribui
+     disciplina+professor+carga horária). `StudentFormDialog` ganhou um
+     select de Turma, visível só quando `school.academicModel === "SECONDARY"`.
+     Restrito a `SUPER_ADMIN/ADMIN/STAFF` pra criar/editar, `+DIRECTOR/TEACHER`
+     pra leitura (espelha `turmas.routes.js`/`turmaSubjects.routes.js`);
+     excluir turma/disciplina restrito a `SUPER_ADMIN/ADMIN`.
+     **Renomeação necessária:** a rota/nav `/turmas` já existia antes desta
+     fase, mas apontava pro `Classroom` (sala física) — um "turma" que na
+     verdade era sala, colisão de nome descoberta ao planejar esta fase.
+     Renomeado pra `/salas` ("Salas") antes de criar o novo `/turmas` de
+     verdade, pra não confundir os dois conceitos (não confundir `Turma`
+     pedagógica com `Classroom`/sala física nos models).
+     **Delete bloqueado com 409** se a turma tiver alunos ou disciplinas
+     atribuídas (mesmo padrão de proteção já usado em `Assessment`).
+     **Deliberadamente fora do escopo desta fase** (decisão explícita do
+     usuário): Ano letivo/Período como entidade formal (`academicYear`
+     continua texto livre, ver item abaixo), ~~`Schedule`/horário de aula
+     pra `SECONDARY` (só existe pro lado `HIGHER_ED`)~~ **feito na Fase 9a**
+     (`TurmaSchedule`, ver seção 6, item 5), Avaliações/notas pra
+     `SECONDARY` via `Turma` (o fluxo de Avaliações/Notas da Fase 5 continua
+     exclusivo de `CourseOfferingSubject`/`HIGHER_ED`), e Portal do Professor
+     (ainda bloqueado — agora só falta a parte de Avaliações pro lado
+     `SECONDARY`, já que a relação professor↔turma↔disciplina em si já
+     existe via `TurmaSubject`).
+     **Validado só estaticamente** (sintaxe, cadeia de `require`, boot do
+     `server.js`, `vite build` — 1088 módulos) — sem MySQL/Docker disponível
+     neste ambiente, os fluxos de criar turma, atribuir disciplina/professor
+     e vincular aluno não foram testados contra dado real.
+   - **Ano letivo/período como entidade formal.** `Grade.term` (e o campo
+     equivalente em `CourseOffering`) é uma string livre tipo `"2026-S1"` — não
+     existe uma tabela `AcademicYear`/`Term`. Sem isso não tem como abrir/
+     fechar um ano letivo formalmente nem promover alunos em massa pro
+     próximo ano/série.
+
+8. **Notificação automática de propina por SMS/WhatsApp com referência M-Pesa —
+   diferencial de mercado (MZ). Parcialmente feito na Fase 8 do roadmap de
+   execução: alertas no painel + entidade/referência local + confirmação de
+   pagamento. SMS/WhatsApp/M-Pesa de verdade continuam de fora — ver
+   detalhamento abaixo.**
+   - **Proposta original:** todo fim de mês, o sistema gera automaticamente as
+     propinas em aberto do período e dispara uma notificação por SMS ou
+     WhatsApp para o encarregado de educação, incluindo a referência de
+     pagamento móvel (M-Pesa) pra pagar sem precisar ir à secretaria.
+   - ~~**Referência de pagamento.**~~ **Feito (Fase 8), com escopo reduzido a
+     pedido do usuário: geração local, sem gateway real.** `Fee` ganhou
+     `entity`/`reference` — `reference` é derivada do próprio `Fee.id`
+     (`utils/paymentReference.js`, zero-padded, único por construção) e
+     `entity` é um snapshot de `School.paymentEntity` (novo campo,
+     configurável por `ADMIN`/`SUPER_ADMIN`) no momento da criação da
+     propina. **Isso NÃO é uma referência validada por nenhum banco/M-Pesa
+     de verdade** — sistemas reais (Multibanco, Multicaixa Express) usam um
+     dígito de controlo calculado dentro de um contrato de "entidade
+     aderente" com o banco, que este projeto não tem. É só um identificador
+     interno, legível e copiável (botão de copiar em `FeesListPage` e
+     `FeeAlertsPage`), pra secretaria/encarregado usar na conciliação manual.
+   - ~~**Alertas.**~~ **Feito (Fase 8), decisão explícita do usuário: só no
+     painel, sem SMS/WhatsApp/email nesta rodada.** Novo
+     `GET /api/fees/alerts` (`fee.controller.js getFeeAlerts`): propinas
+     atrasadas + a vencer nos próximos 7 dias, agrupadas por aluno, com
+     totais por moeda (mesma ressalva multi-moeda do KPI do dashboard) —
+     calculado na hora a cada chamada, sem cache, pra nunca mostrar dado
+     desatualizado depois de uma confirmação. Frontend:
+     `/propinas/alertas` (`FeeAlertsPage`), mesmos papéis de `/propinas`.
+     STUDENT auto-escopado às próprias (mesmo padrão de `getAllFees`).
+   - ~~**Atualizar situação financeira do aluno.**~~ **Feito (Fase 8) via
+     confirmação de pagamento, sem tela de histórico dedicada.** Extraído
+     `backend/services/feePayment.service.js` (`confirmFeePayment`/
+     `revertFeePayment`) — usado por `markFeeStatus` (STAFF confirma
+     manualmente depois de conferir o comprovativo, como já existia) e é o
+     ponto de extensão do webhook abaixo. `Fee` ganhou `paymentMethod`
+     (MANUAL/WEBHOOK) e `confirmedById`, então toda propina paga mostra
+     quem/como confirmou (tooltip no chip "Pago" de `FeesListPage`). Como o
+     cálculo dos totais em `/propinas/alertas` é sempre ao vivo, a
+     "situação financeira" nunca fica desatualizada depois de uma
+     confirmação — decisão deliberada de não duplicar isso num campo
+     cacheado no `Student` (risco de ficar dessincronizado).
+   - ~~**Preparar para receber webhook no futuro.**~~ **Feito (Fase 8),
+     decisão explícita do usuário: "vai de manual primeiro, mas prepara
+     para receber webhook no futuro".** Novo endpoint
+     `POST /api/fees-webhook/payment-confirmation`
+     (`backend/controllers/feeWebhook.controller.js`), **sem** nenhum
+     gateway real chamando-o ainda: sem `authMiddleware` (provedor externo
+     não tem JWT deste sistema), protegido por um segredo simples
+     (`X-Webhook-Secret` comparado a `PAYMENT_WEBHOOK_SECRET` no `.env`,
+     vazio por padrão — a rota responde 503 até alguém configurar).
+     Idempotente (reenvio da mesma notificação não reprocessa). Busca o
+     `Fee` por `reference` e chama o mesmo `confirmFeePayment` do fluxo
+     manual, com `method: "WEBHOOK"`. **Não** grava log de auditoria (ver
+     comentário no controller: `LogAudit` não tem `schoolId` próprio, o
+     isolamento por escola depende de um join obrigatório em `User`, e uma
+     confirmação via webhook não tem `userId` — o log ficaria invisível
+     pra qualquer `ADMIN` de escola; a rastreabilidade fica no próprio
+     `Fee`). Quando um gateway real (M-Pesa ou outro) for escolhido, é só
+     apontar o webhook dele pra essa rota — o formato exato do payload
+     desse gateway específico ainda não foi modelado, porque nenhum foi
+     escolhido.
+   - **De quebra:** `PATCH /api/schools/:id` era `SUPER_ADMIN`-only mesmo o
+     comentário da rota já falando em "a própria escola pode editar" —
+     inconsistência corrigida: agora `ADMIN` também edita a própria escola
+     (checagem de posse no controller, mesmo padrão de `getSchoolById`;
+     `plan`/`status` continuam bloqueados pro `ADMIN`, são decisão de
+     billing da plataforma). Necessário pra `ADMIN` configurar
+     `paymentEntity` sem depender do `SUPER_ADMIN`. Nova
+     `SchoolSettingsPage` (`/escola/configuracoes`, só `ADMIN`) além do
+     campo adicionado em `SchoolFormDialog` (fluxo `SUPER_ADMIN` via
+     `/escolas`).
+   - **Pré-requisitos que ainda faltam, todos do zero (fora de escopo desta
+     fase, decisão explícita do usuário — "SMS/WhatsApp exigiria integrar um
+     gateway novo do zero"):**
+     - Papel/cadastro de **encarregado de educação (guardian)** — hoje não
+       existe (`GUARDIAN` foi cogitado e adiado de propósito, ver seção 7);
+       sem isso não tem "pra quem" mandar a notificação nem o contacto
+       (telefone) de quem recebe.
+     - **Job agendado de fim de mês** — não existe nenhum scheduler no projeto
+       (`package.json` do backend não tem `node-cron` nem equivalente); hoje
+       toda propina é lançada manualmente pela secretaria (Portal do Staff).
+     - **Integração real com gateway de pagamento móvel (M-Pesa)** — o
+       endpoint de webhook está pronto pra receber a confirmação (ver acima),
+       mas gerar/validar a referência do lado do banco exige credenciais/API
+       que este projeto não tem.
+     - **Envio de SMS/WhatsApp** — não existe integração com nenhum provedor
+       (Twilio, WhatsApp Business API, gateway de SMS local em MZ, etc.); o
+       único canal de notificação hoje é email (`utils/email.js`, e mesmo esse
+       não está ligado a nada — ver seção 5) e agora o painel de alertas.
+   - **Validado só estaticamente** (sintaxe, cadeia de `require`, boot do
+     `server.js`, `vite build` — 1096 módulos) — sem MySQL/Docker disponível
+     neste ambiente, os fluxos de gerar entidade/referência ao criar uma
+     propina, confirmar pagamento manual e via webhook, e configurar a
+     entidade da escola não foram testados contra dado real.
 
 ## 7. Decisões em aberto
 
@@ -519,12 +980,7 @@ Ordem sugerida, do que destrava o quê:
   integração com gateway (Multicaixa/M-Pesa/cartão dependendo do país),
   periodicidade recorrente automática em vez de lançamento manual por
   período.
-- **Tela de criar STAFF — ainda não existe.** `staff.routes.js` só tem
-  GET/PATCH/DELETE, nenhum POST ligado a frontend (diferente de Teacher e
-  Student, que têm `TeacherFormDialog`/`StudentFormDialog` criando via
-  `/auth/register-user`). Hoje a única forma de criar uma conta STAFF é
-  chamar a API direto. Adiado de propósito nesta rodada (decisão explícita:
-  "fica pra depois") — próxima rodada de portal/acesso deve incluir isso.
+- ~~Tela de criar STAFF — ainda não existe.~~ **Feito.** Ver seção 6, item 6.
 - **Auto-cadastro (self-service) — nenhum papel operacional se cadastra
   sozinho hoje**, só a escola em si (`/registrar-escola`, que cria a escola
   + o primeiro ADMIN). Levantado ao decidir a landing page:
@@ -537,12 +993,19 @@ Ordem sugerida, do que destrava o quê:
   - Não decidido ainda se vale a pena terminar o auto-cadastro de aluno
     (métrica de esforço: resolver escola por slug + tela pública) ou se o
     fluxo "admin cadastra todo mundo" é suficiente pro produto.
-- **Esqueci minha senha — só existe o esqueleto no backend.**
-  `forgotPassword`/`resetPassword` geram e validam token real (expira em 15
-  min), mas a entrega do link de reset é só um `console.log` no servidor —
-  não tem envio de email de verdade (`email.routes.js` nunca foi terminado,
-  ver seção 5) — e não existe nenhuma tela no frontend pra iniciar o pedido
-  nem pra colar o token. "Trocar minha senha" (logado, com a senha atual)
-  foi implementado nesta rodada e resolve o caso "lembro a senha atual, só
-  quero trocar" — mas "esqueci de verdade" continua sem solução até ter um
-  serviço de email real por trás.
+- ~~Esqueci minha senha — só existe o esqueleto no backend.~~ **Feito.** Ver
+  seção 6, item 6. Falta só preencher `EMAIL_USER`/`EMAIL_PASS` reais em
+  `backend/.env` e testar o envio de fato (não testado neste ambiente).
+- **Login falhando em conta pré-existente (não investigado a fundo).**
+  Testado localmente via Docker após as mudanças de schema desta rodada
+  (ENUM `role` ganhando `STAFF`, `School.currency`): uma conta **nova**
+  logou normalmente, mas uma conta **antiga** (criada antes dessas
+  mudanças) deu erro no login (`500` e depois `404` em tentativas
+  seguintes). Root cause não foi diagnosticado — suspeita é dado
+  legado incompatível com o schema atual, não bug no fluxo de login em
+  si (conta nova funciona). Decisão explícita: não investigar agora,
+  seguir com a conta nova. Fica registrado como risco real pra quando
+  houver migração de dados de escolas de verdade (produção) — rodar a
+  investigação (comparar os registros das duas contas no banco, checar
+  se `role`/`currency`/outro campo novo ficou `NULL` ou inválido na
+  conta antiga) antes de qualquer go-live com dados existentes.

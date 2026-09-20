@@ -6,12 +6,23 @@
   estourar um erro cru (achado no code review desta rodada — ver
   docs/project-rules.md).
 */
-function validateAmount(amount) {
-  const parsed = Number(amount);
+// Núcleo compartilhado por validateAmount/validatePositiveNumber — extraído
+// em code review (fase 5 do roadmap de execução) ao notar que
+// assessment.controller.js validava peso/nota máxima com `Number(x)` cru,
+// sem checar NaN nem negativo: um weight tipo "abc" virava NaN, e
+// `NaN > 100` é sempre false, então o guard de "peso não pode passar de
+// 100%" passava batido e a query de update quebrava lá na frente com um
+// SequelizeDatabaseError cru.
+function validatePositiveNumber(value, fieldName) {
+  const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    return { error: "amount must be a positive number." };
+    return { error: `${fieldName} must be a positive number.` };
   }
   return { value: parsed };
+}
+
+function validateAmount(amount) {
+  return validatePositiveNumber(amount, "amount");
 }
 
 function validateCurrency(currency) {
@@ -21,4 +32,4 @@ function validateCurrency(currency) {
   return { value: currency.trim().toUpperCase() };
 }
 
-module.exports = { validateAmount, validateCurrency };
+module.exports = { validateAmount, validateCurrency, validatePositiveNumber };

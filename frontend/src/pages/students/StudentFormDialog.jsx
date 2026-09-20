@@ -8,10 +8,13 @@ import {
   DialogContent,
   DialogTitle,
   Grid,
+  MenuItem,
   TextField,
 } from "@mui/material";
 import { createStudent, updateStudent } from "../../api/students.js";
+import { listTurmas } from "../../api/turmas.js";
 import { getErrorMessage } from "../../api/errors.js";
+import { useAuth } from "../../context/AuthContext.jsx";
 
 const emptyForm = {
   name: "",
@@ -23,12 +26,16 @@ const emptyForm = {
   idCard: "",
   idNumber: "",
   notes: "",
+  turmaId: "",
 };
 
 // student === null → modo criação. student preenchido → modo edição.
 export default function StudentFormDialog({ open, student, onClose, onSaved }) {
+  const { user } = useAuth();
+  const isSecondary = user?.school?.academicModel === "SECONDARY";
   const isEditing = Boolean(student);
   const [form, setForm] = useState(emptyForm);
+  const [turmas, setTurmas] = useState([]);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -47,10 +54,16 @@ export default function StudentFormDialog({ open, student, onClose, onSaved }) {
             idCard: student.idCard || "",
             idNumber: student.idNumber || "",
             notes: student.notes ?? "",
+            turmaId: student.turmaId || "",
           }
         : emptyForm
     );
-  }, [open, student]);
+    if (isSecondary) {
+      listTurmas()
+        .then(setTurmas)
+        .catch(() => setTurmas([]));
+    }
+  }, [open, student, isSecondary]);
 
   function handleChange(field) {
     return (event) => setForm((prev) => ({ ...prev, [field]: event.target.value }));
@@ -66,9 +79,10 @@ export default function StudentFormDialog({ open, student, onClose, onSaved }) {
         await updateStudent(student.id, {
           ...editable,
           notes: editable.notes === "" ? null : Number(editable.notes),
+          turmaId: editable.turmaId || null,
         });
       } else {
-        await createStudent(form);
+        await createStudent({ ...form, turmaId: form.turmaId || null });
       }
       onSaved();
     } catch (err) {
@@ -135,12 +149,31 @@ export default function StudentFormDialog({ open, student, onClose, onSaved }) {
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
-                label="Série/turma"
+                label="Série/turma (texto livre)"
                 value={form.grade}
                 onChange={handleChange("grade")}
                 fullWidth
               />
             </Grid>
+            {isSecondary && (
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  select
+                  label="Turma"
+                  value={form.turmaId}
+                  onChange={handleChange("turmaId")}
+                  fullWidth
+                  helperText="Opcional — vincula o aluno a uma turma cadastrada"
+                >
+                  <MenuItem value="">— Sem turma —</MenuItem>
+                  {turmas.map((t) => (
+                    <MenuItem key={t.id} value={t.id}>
+                      {t.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+            )}
             <Grid item xs={12} sm={6}>
               <TextField
                 label="Telefone"

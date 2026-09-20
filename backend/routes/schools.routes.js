@@ -26,6 +26,12 @@ router.get(
   authorizeRoles("SUPER_ADMIN", "ADMIN", "DIRECTOR", "STAFF"),
   getSchoolById
 );
-router.patch("/:id", authMiddleware, authorizeRoles("SUPER_ADMIN"), updateSchool);
+// Antes era SUPER_ADMIN-only, apesar do comentário acima já falar em "a
+// própria escola pode editar" — inconsistência corrigida na Fase 8 (ver
+// docs/project-rules.md, seção 6): ADMIN precisa disso pra configurar a
+// entidade de pagamento (paymentEntity) da própria escola sem depender do
+// dono da plataforma. Checagem de posse (ADMIN só edita a própria escola)
+// e bloqueio de campos sensíveis (plan/status) ficam no controller.
+router.patch("/:id", authMiddleware, authorizeRoles("SUPER_ADMIN", "ADMIN"), updateSchool);
 
 module.exports = router;

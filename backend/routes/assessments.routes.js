@@ -9,6 +9,9 @@ const requireAcademicModel = require("../middleware/academicModel.middleware");
 const {
   createAssessment,
   getAssessments,
+  getAssessmentById,
+  updateAssessment,
+  deleteAssessment,
 } = require("../controllers/assessment.controller");
 
 const requireHigherEd = requireAcademicModel("HIGHER_ED");
@@ -33,6 +36,33 @@ router.get(
   requireSchool,
   requireHigherEd,
   getAssessments
+);
+
+router.get(
+  "/:id",
+  authMiddleware,
+  authorizeRoles("ADMIN", "SUPER_ADMIN", "TEACHER", "DIRECTOR", "STAFF", "STUDENT"),
+  requireSchool,
+  requireHigherEd,
+  getAssessmentById
+);
+
+router.put(
+  "/:id",
+  authMiddleware,
+  authorizeRoles("ADMIN", "SUPER_ADMIN", "TEACHER"),
+  requireSchool,
+  requireHigherEd,
+  updateAssessment
+);
+
+router.delete(
+  "/:id",
+  authMiddleware,
+  authorizeRoles("ADMIN", "SUPER_ADMIN"),
+  requireSchool,
+  requireHigherEd,
+  deleteAssessment
 );
 
 module.exports = router;

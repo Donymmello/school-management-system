@@ -11,6 +11,7 @@ const {
   getFeeById,
   updateFee,
   markFeeStatus,
+  getFeeAlerts,
   deleteFee,
 } = require("../controllers/fee.controller");
 
@@ -24,6 +25,9 @@ const READ_ROLES = [...MANAGE_ROLES, "STUDENT"];
 
 router.post("/", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, createFee);
 router.get("/", authMiddleware, authorizeRoles(...READ_ROLES), requireSchool, getAllFees);
+// IMPORTANTE: /alerts precisa vir antes de /:id, senão o Express casa
+// "alerts" como se fosse o :id da rota de baixo.
+router.get("/alerts", authMiddleware, authorizeRoles(...READ_ROLES), requireSchool, getFeeAlerts);
 router.get("/:id", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, getFeeById);
 router.patch("/:id", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, updateFee);
 router.patch("/:id/status", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, markFeeStatus);

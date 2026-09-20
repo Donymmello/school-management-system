@@ -67,6 +67,43 @@ const Fee = sequelize.define(
       allowNull: true,
       field: "notes",
     },
+    // Entidade+Referência de pagamento (Fase 8, ver docs/project-rules.md,
+    // seção 6) — geração local, sem integração real com banco/M-Pesa:
+    // - entity: snapshot de School.paymentEntity no momento em que a
+    //   propina foi criada (fica null se a escola ainda não configurou uma
+    //   entidade). Não é um FK vivo de propósito — se a escola trocar de
+    //   entidade depois, propinas antigas continuam mostrando a entidade
+    //   com que foram emitidas, mesmo padrão já usado pra `currency`.
+    // - reference: gerada a partir do próprio Fee.id (ver
+    //   utils/paymentReference.js) — único por construção, sem precisar de
+    //   gerador separado nem retry de colisão.
+    entity: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      field: "entity",
+    },
+    reference: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      unique: true,
+      field: "reference",
+    },
+    // Preenchidos só quando status vira PAID — quem/como confirmou. MANUAL
+    // é o único caminho real hoje (STAFF confirma depois de conferir o
+    // comprovativo); WEBHOOK existe como ponto de extensão pronto pra um
+    // gateway de pagamento real no futuro (ver
+    // backend/controllers/feeWebhook.controller.js) — nenhum provedor está
+    // integrado ainda, ninguém chama essa rota de verdade neste sistema.
+    paymentMethod: {
+      type: DataTypes.ENUM("MANUAL", "WEBHOOK"),
+      allowNull: true,
+      field: "payment_method",
+    },
+    confirmedById: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: "confirmed_by_id",
+    },
   },
   {
     tableName: "fees",

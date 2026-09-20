@@ -24,6 +24,10 @@ const Enrollment = require("./enrollment");
 const Schedule = require("./schedule");
 const Classroom = require("./classroom");
 
+const Turma = require("./turma");
+const TurmaSubject = require("./turmaSubject");
+const TurmaSchedule = require("./turmaSchedule");
+
 const LogAudit = require("./logAudit");
 
 /*
@@ -187,6 +191,12 @@ Fee.belongsTo(Student, {
   foreignKey: "studentId",
   as: "student",
 });
+
+// Fee 1 - N confirmadas por User (Fase 8 — quem marcou como paga
+// manualmente; null quando ainda pendente ou confirmada via webhook, ver
+// backend/models/fee.js)
+User.hasMany(Fee, { foreignKey: "confirmedById", as: "confirmedFees" });
+Fee.belongsTo(User, { foreignKey: "confirmedById", as: "confirmedBy" });
 
 /*
   ======================================================
@@ -363,6 +373,43 @@ Schedule.belongsTo(Classroom, {
 
 /*
   ======================================================
+  TURMA RELATIONS (pedagógica, SECONDARY — ver backend/models/turma.js,
+  não confundir com CLASSROOM acima, que é sala física)
+  ======================================================
+*/
+
+// School 1 - N Turma
+School.hasMany(Turma, { foreignKey: "schoolId", as: "turmas" });
+Turma.belongsTo(School, { foreignKey: "schoolId", as: "school" });
+
+// Turma 1 - N Student
+Turma.hasMany(Student, { foreignKey: "turmaId", as: "students" });
+Student.belongsTo(Turma, { foreignKey: "turmaId", as: "turma" });
+
+// Turma opcionalmente aponta pra uma sala física "principal"
+Classroom.hasMany(Turma, { foreignKey: "classroomId", as: "turmas" });
+Turma.belongsTo(Classroom, { foreignKey: "classroomId", as: "classroom" });
+
+// Turma 1 - N TurmaSubject (atribuição de disciplina+professor)
+Turma.hasMany(TurmaSubject, { foreignKey: "turmaId", as: "subjects" });
+TurmaSubject.belongsTo(Turma, { foreignKey: "turmaId", as: "turma" });
+
+Subject.hasMany(TurmaSubject, { foreignKey: "subjectId", as: "turmaAssignments" });
+TurmaSubject.belongsTo(Subject, { foreignKey: "subjectId", as: "subject" });
+
+Teacher.hasMany(TurmaSubject, { foreignKey: "teacherId", as: "turmaAssignments" });
+TurmaSubject.belongsTo(Teacher, { foreignKey: "teacherId", as: "teacher" });
+
+// TurmaSubject 1 - N TurmaSchedule (horário, Fase 9a — "Meu horário" pro
+// SECONDARY, espelha CourseOfferingSubject -> Schedule do HIGHER_ED)
+TurmaSubject.hasMany(TurmaSchedule, { foreignKey: "turmaSubjectId", as: "schedules" });
+TurmaSchedule.belongsTo(TurmaSubject, { foreignKey: "turmaSubjectId", as: "turmaSubject" });
+
+Classroom.hasMany(TurmaSchedule, { foreignKey: "classroomId", as: "turmaSchedules" });
+TurmaSchedule.belongsTo(Classroom, { foreignKey: "classroomId", as: "classroom" });
+
+/*
+  ======================================================
   ASSESSMENT RELATIONS
   ======================================================
 */
@@ -465,6 +512,10 @@ module.exports = {
   Enrollment,
 
   Classroom,
+
+  Turma,
+  TurmaSubject,
+  TurmaSchedule,
 
   LogAudit,
 };

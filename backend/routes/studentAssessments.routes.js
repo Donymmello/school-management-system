@@ -8,7 +8,10 @@ const requireAcademicModel = require("../middleware/academicModel.middleware");
 
 const {
   recordScore,
+  getStudentAssessments,
 } = require("../controllers/studentAssessment.controller");
+
+const requireHigherEd = requireAcademicModel("HIGHER_ED");
 
 router.post(
   "/",
@@ -19,8 +22,17 @@ router.post(
     "TEACHER"
   ),
   requireSchool,
-  requireAcademicModel("HIGHER_ED"),
+  requireHigherEd,
   recordScore
+);
+
+router.get(
+  "/",
+  authMiddleware,
+  authorizeRoles("ADMIN", "SUPER_ADMIN", "TEACHER", "DIRECTOR", "STAFF", "STUDENT"),
+  requireSchool,
+  requireHigherEd,
+  getStudentAssessments
 );
 
 module.exports = router;

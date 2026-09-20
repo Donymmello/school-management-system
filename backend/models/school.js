@@ -50,12 +50,27 @@ const School = sequelize.define("School", {
   // Moeda usada pras propinas (Fee) dessa escola — cada Fee copia esse
   // valor no momento da criação, então mudar isso aqui não altera
   // lançamentos já existentes. Editável por ADMIN/SUPER_ADMIN, sem lista
-  // fixa de valores (mercado do sistema não é um único país).
+  // fixa de valores (o sistema aceita qualquer código de 3 letras, não só
+  // MZN — uma escola pode querer cobrar em USD, por exemplo). Default MZN
+  // (Metical) porque o mercado principal do sistema é Moçambique.
   currency: {
     type: DataTypes.STRING(3),
     allowNull: false,
-    defaultValue: "AOA",
+    defaultValue: "MZN",
     field: "currency",
+  },
+  // "Entidade" do sistema de referência de pagamento (padrão Multicaixa
+  // Express/ATM usado em Moçambique/Angola: Entidade + Referência + Valor).
+  // Configurável pela própria escola (ver docs/project-rules.md, seção 6,
+  // fase 8) — nula até a escola configurar; Fee.entity só é preenchido se
+  // isso estiver definido no momento em que a propina é criada. NÃO é uma
+  // entidade validada por nenhum banco de verdade, é só o código que a
+  // escola decide usar/divulgar aos pais — sem integração real com
+  // banco/M-Pesa neste sistema (ver ressalvas na fase 8 do roadmap).
+  paymentEntity: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    field: "payment_entity",
   },
 },
 {

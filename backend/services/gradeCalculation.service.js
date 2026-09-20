@@ -8,6 +8,7 @@ const {
     Subject,
 } = require('../models');
 const { tenantWhere } = require('../utils/tenantScope');
+const { resolveOwnStudentId } = require('../utils/selfScope');
 
 function notFound(message) {
     const error = new Error(message);
@@ -27,6 +28,20 @@ async function calculateStudentResult(req, { enrollmentId, courseOfferingSubject
 
     if (!enrollment) {
         throw notFound("Enrollment not found in this school.");
+    }
+
+    // Bug de isolamento real corrigido na Fase 9d (ver
+    // docs/project-rules.md, seção 6): a rota já liberava STUDENT em
+    // authorizeRoles, mas nada aqui checava se a matrícula era do próprio
+    // aluno — bastava trocar o :enrollmentId na URL pra ver o resultado de
+    // qualquer colega da mesma escola. Mesma classe de bug já corrigida em
+    // Schedule na Fase 9a. 404 (não 403) de propósito, pra não confirmar
+    // que a matrícula de outro aluno existe.
+    if (req.user.role === "STUDENT") {
+        const ownStudentId = await resolveOwnStudentId(req);
+        if (!ownStudentId || enrollment.studentId !== ownStudentId) {
+            throw notFound("Enrollment not found in this school.");
+        }
     }
 
     const courseOfferingSubject = await CourseOfferingSubject.findOne({

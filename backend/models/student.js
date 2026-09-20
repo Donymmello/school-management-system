@@ -36,6 +36,18 @@ const Student = sequelize.define(
       field: "classroom_id",
     },
 
+    // Turma pedagógica (SECONDARY) — ver backend/models/turma.js. Separado
+    // de classroomId (sala física) de propósito: um é "a que turma o aluno
+    // pertence", outro é "em que sala". Nulo pra alunos HIGHER_ED (que usam
+    // Enrollment/CourseOffering em vez de turma) ou SECONDARY ainda sem
+    // turma atribuída — campo aditivo, não obrigatório, pra não quebrar
+    // alunos já cadastrados antes desta rodada.
+    turmaId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: "turma_id",
+    },
+
     name: {
       type: DataTypes.STRING,
       allowNull: false,

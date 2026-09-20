@@ -1,8 +1,15 @@
-const { Fee, Student, School } = require("../models");
+const { Op } = require("sequelize");
+const { Fee, Student, School, User } = require("../models");
 const registerLogAudit = require("../utils/logAudit");
 const { tenantWhere } = require("../utils/tenantScope");
 const { resolveOwnStudentId } = require("../utils/selfScope");
 const { validateAmount, validateCurrency } = require("../utils/validators");
+const { generateReference } = require("../utils/paymentReference");
+const { confirmFeePayment, revertFeePayment } = require("../services/feePayment.service");
+
+// Anexado no include de getAllFees/getFeeById só pra exibir "quem
+// confirmou" — nunca usado como filtro nem exigido (required: false).
+const CONFIRMED_BY_INCLUDE = { model: User, as: "confirmedBy", attributes: ["id", "name"], required: false };
 
 // Fee não tem schoolId próprio (ver docs/project-rules.md, seção 5) — o
 // isolamento por escola é feito via join obrigatório no Student dono do
@@ -39,11 +46,13 @@ async function createFee(req, res) {
 
     // Busca o Student junto com a School dona pra validar o tenant e, se o
     // caller não mandou currency, herdar a moeda configurada na escola
-    // (ver docs/project-rules.md, seção 6, item 5).
+    // (ver docs/project-rules.md, seção 6, item 5). paymentEntity entra no
+    // mesmo include, pra já ter a entidade de pagamento da escola em mãos
+    // (Fase 8) sem uma segunda query.
     const student = await Student.findOne({
       where: tenantWhere(req, { id: studentId }),
       attributes: ["id"],
-      include: [{ model: School, as: "school", attributes: ["currency"] }],
+      include: [{ model: School, as: "school", attributes: ["currency", "paymentEntity"] }],
     });
     if (!student) return res.status(404).json({ message: "Student not found in this school." });
 
@@ -52,8 +61,18 @@ async function createFee(req, res) {
       description,
       amount: amountCheck.value,
       dueDate,
-      currency: currencyValue || student.school?.currency || "AOA",
+      currency: currencyValue || student.school?.currency || "MZN",
       notes: notes || null,
+    });
+
+    // Entidade+referência de pagamento (Fase 8) só dá pra gerar depois do
+    // INSERT, porque a referência é derivada do próprio id gerado pelo
+    // banco (ver utils/paymentReference.js) — por isso é um update logo em
+    // seguida, não um campo no create() acima. entity fica null se a
+    // escola ainda não configurou uma (ver School.paymentEntity).
+    await fee.update({
+      reference: generateReference(fee.id),
+      entity: student.school?.paymentEntity || null,
     });
 
     await registerLogAudit({
@@ -91,7 +110,7 @@ async function getAllFees(req, res) {
 
     const fees = await Fee.findAll({
       where,
-      include: [studentScope(req)],
+      include: [studentScope(req), CONFIRMED_BY_INCLUDE],
       order: [["due_date", "ASC"]],
     });
 
@@ -106,7 +125,7 @@ async function getFeeById(req, res) {
   try {
     const fee = await Fee.findOne({
       where: { id: req.params.id },
-      include: [studentScope(req)],
+      include: [studentScope(req), CONFIRMED_BY_INCLUDE],
     });
 
     if (!fee) return res.status(404).json({ message: "Fee not found." });
@@ -165,10 +184,16 @@ async function markFeeStatus(req, res) {
     });
     if (!fee) return res.status(404).json({ message: "Fee not found." });
 
-    await fee.update({
-      status,
-      paidAt: status === "PAID" ? new Date() : null,
-    });
+    // Confirmação manual (Fase 8, ver backend/services/feePayment.service.js)
+    // — método fixo "MANUAL" aqui porque quem chama essa rota é sempre um
+    // STAFF/ADMIN autenticado confirmando depois de conferir o
+    // comprovativo. O outro método possível ("WEBHOOK") só existe no
+    // endpoint separado pra gateway de pagamento (ainda não integrado).
+    if (status === "PAID") {
+      await confirmFeePayment(fee, { method: "MANUAL", confirmedByUserId: req.user.id });
+    } else {
+      await revertFeePayment(fee);
+    }
 
     await registerLogAudit({
       userId: req.user.id,
@@ -182,6 +207,77 @@ async function markFeeStatus(req, res) {
   } catch (error) {
     console.error("[Error updating fee status]:", error);
     return res.status(500).json({ message: "An error occurred while updating the fee status." });
+  }
+}
+
+// Alertas de propina (Fase 8, ver docs/project-rules.md, seção 6): junta
+// propinas atrasadas (PENDING + vencimento no passado) e a vencer nos
+// próximos `days` dias (default 7), agrupadas por aluno, com totais por
+// moeda — a "situação financeira" pedida fica visível aqui de forma
+// sempre fresca (calculada na hora, sem cache pra não ficar desatualizada
+// depois de uma confirmação de pagamento). STUDENT vê só as próprias
+// (mesmo auto-escopo de getAllFees); os demais papéis autorizados veem a
+// escola inteira.
+async function getFeeAlerts(req, res) {
+  try {
+    const daysAhead = Number(req.query.days) > 0 ? Number(req.query.days) : 7;
+    const horizonStr = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const where = { status: "PENDING", dueDate: { [Op.lte]: horizonStr } };
+
+    if (req.user.role === "STUDENT") {
+      const ownStudentId = await resolveOwnStudentId(req);
+      if (!ownStudentId) return res.status(403).json({ message: "Student profile not found for this user." });
+      where.studentId = ownStudentId;
+    }
+
+    const fees = await Fee.findAll({
+      where,
+      include: [studentScope(req)],
+      order: [["due_date", "ASC"]],
+    });
+
+    const todayDate = new Date(new Date().toDateString());
+    const byStudent = new Map();
+
+    for (const fee of fees) {
+      const isOverdue = new Date(fee.dueDate) < todayDate;
+      const key = fee.studentId;
+
+      if (!byStudent.has(key)) {
+        byStudent.set(key, {
+          studentId: fee.studentId,
+          studentName: fee.student?.name || null,
+          studentCode: fee.student?.studentCode || null,
+          overdue: [],
+          dueSoon: [],
+          // Totais por moeda: um aluno pode, em tese, ter propinas em mais
+          // de uma moeda (lançamentos antigos com moeda diferente da atual
+          // da escola — mesma ressalva já documentada no KPI do dashboard,
+          // ver docs/project-rules.md, seção 6, item 4).
+          totals: {},
+        });
+      }
+
+      const bucket = byStudent.get(key);
+      const feeJson = fee.toJSON();
+      const bucketKey = isOverdue ? "overdue" : "dueSoon";
+      bucket[bucketKey].push(feeJson);
+
+      if (!bucket.totals[fee.currency]) {
+        bucket.totals[fee.currency] = { overdue: 0, dueSoon: 0 };
+      }
+      bucket.totals[fee.currency][bucketKey] += Number(fee.amount);
+    }
+
+    return res.status(200).json({
+      daysAhead,
+      generatedAt: new Date().toISOString(),
+      students: Array.from(byStudent.values()),
+    });
+  } catch (error) {
+    console.error("[Error building fee alerts]:", error);
+    return res.status(500).json({ message: "An error occurred while building fee alerts." });
   }
 }
 
@@ -207,5 +303,6 @@ module.exports = {
   getFeeById,
   updateFee,
   markFeeStatus,
+  getFeeAlerts,
   deleteFee,
 };

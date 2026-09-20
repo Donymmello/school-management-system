@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
@@ -28,6 +28,60 @@ import AttendanceFormDialog from "./AttendanceFormDialog.jsx";
 const STATUS_LABELS = { PRESENT: "Presente", ABSENT: "Ausente", LATE: "Atrasado", JUSTIFIED: "Falta justificada" };
 const STATUS_COLORS = { PRESENT: "success", ABSENT: "error", LATE: "warning", JUSTIFIED: "default" };
 const READ_ONLY_ROLES = ["STUDENT"];
+
+// Fase 9b (ver docs/project-rules.md, seção 6): resumo em cima da lista
+// crua que já existia — calculado no cliente a partir dos registros já
+// auto-escopados (STUDENT só recebe os próprios do GET /attendance
+// existente), sem endpoint novo no backend. Só faz sentido pro aluno
+// (readOnly): pra staff a tabela mistura vários alunos, um % agregado
+// misturaria gente diferente.
+function AttendanceSummary({ records }) {
+  const summary = useMemo(() => {
+    const counts = { PRESENT: 0, ABSENT: 0, LATE: 0, JUSTIFIED: 0 };
+    for (const record of records) {
+      if (counts[record.status] !== undefined) counts[record.status] += 1;
+    }
+    const total = records.length;
+    // Taxa de presença conta Presente + Atrasado (o aluno esteve lá,
+    // mesmo chegando tarde) sobre o total de registros. Falta justificada
+    // não entra como "presença" — é uma ausência com motivo aceito, não a
+    // mesma coisa que ter comparecido.
+    const presenceRate = total > 0 ? ((counts.PRESENT + counts.LATE) / total) * 100 : null;
+    return { counts, total, presenceRate };
+  }, [records]);
+
+  if (summary.total === 0) return null;
+
+  return (
+    <Paper sx={{ p: 2, mb: 2 }}>
+      <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
+        <Box>
+          <Typography variant="subtitle2" color="text.secondary">
+            Taxa de presença
+          </Typography>
+          <Typography variant="h4" component="p">
+            {summary.presenceRate.toFixed(0)}%
+          </Typography>
+        </Box>
+        <Box display="flex" gap={1} flexWrap="wrap">
+          {Object.entries(STATUS_LABELS).map(([status, label]) => (
+            <Chip
+              key={status}
+              size="small"
+              variant="outlined"
+              color={STATUS_COLORS[status]}
+              label={`${label}: ${summary.counts[status]}`}
+            />
+          ))}
+        </Box>
+      </Box>
+      <Typography variant="caption" color="text.secondary">
+        Presente + Atrasado sobre o total de {summary.total} registro(s). Falta justificada conta como ausência
+        pra esse cálculo.
+      </Typography>
+    </Paper>
+  );
+}
 
 export default function AttendanceListPage() {
   const { user } = useAuth();
@@ -107,6 +161,8 @@ export default function AttendanceListPage() {
           {error}
         </Alert>
       )}
+
+      {readOnly && !loading && <AttendanceSummary records={records} />}
 
       <TableContainer component={Paper}>
         <Table aria-label="Lista de frequência">

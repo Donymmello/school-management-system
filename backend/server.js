@@ -13,6 +13,9 @@ const staffRoutes = require('./routes/staff.routes');
 const logAuditRoutes = require('./routes/logAudit.routes');
 const subjectRoutes = require('./routes/subjects.routes');
 const classroomRoutes = require('./routes/classrooms.routes');
+const turmaRoutes = require('./routes/turmas.routes');
+const turmaSubjectRoutes = require('./routes/turmaSubjects.routes');
+const turmaScheduleRoutes = require('./routes/turmaSchedules.routes');
 const courseRoutes = require('./routes/courses.routes');
 const courseOfferingRoutes = require('./routes/courseOfferings.routes');
 const enrollmentRoutes = require('./routes/enrollment.routes');
@@ -25,6 +28,8 @@ const gradeRoutes = require('./routes/grades.routes');
 const attendanceRoutes = require('./routes/attendance.routes');
 const academicPolicyRoutes = require('./routes/academicPolicies.routes');
 const feeRoutes = require('./routes/fees.routes');
+const feeWebhookRoutes = require('./routes/feeWebhook.routes');
+const dashboardRoutes = require('./routes/dashboard.routes');
 //const emailRoutes = require('./routes/emails');
 
 const app = express();
@@ -39,6 +44,9 @@ app.use('/api/students', studentRoutes);
 app.use('/api/logs-audit', logAuditRoutes);
 app.use('/api/subjects', subjectRoutes);
 app.use('/api/classrooms', classroomRoutes);
+app.use('/api/turmas', turmaRoutes);
+app.use('/api/turma-subjects', turmaSubjectRoutes);
+app.use('/api/turma-schedules', turmaScheduleRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/course-offerings', courseOfferingRoutes);
 app.use('/api/enrollments', enrollmentRoutes);
@@ -53,6 +61,10 @@ app.use('/api/grades', gradeRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/academic-policies', academicPolicyRoutes);
 app.use('/api/fees', feeRoutes);
+// Sem authMiddleware (ver backend/controllers/feeWebhook.controller.js) —
+// segredo compartilhado próprio via PAYMENT_WEBHOOK_SECRET, não JWT.
+app.use('/api/fees-webhook', feeWebhookRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 //app.use('/api/emails', emailRoutes);
 
 async function startServer() {

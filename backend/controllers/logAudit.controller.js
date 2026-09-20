@@ -3,13 +3,19 @@ const { LogAudit, User } = require("../models");
 
 async function getAllLogsAudit(req, res) {
   try {
+    // req.schoolId vem do requireSchool: null pro SUPER_ADMIN sem filtro
+    // (vê tudo), preso à própria escola pra ADMIN. LogAudit não tem
+    // schoolId próprio — o isolamento só é possível via join no User dono
+    // do log, com required:true quando há filtro (vira inner join, exclui
+    // logs de outras escolas em vez de só anexar o dado).
     const logs = await LogAudit.findAll({
       include: [
         {
           model: User,
           as: "user",
-          required: false,
-          attributes: ["id", "nome", "email", "role", "ativo"],
+          required: Boolean(req.schoolId),
+          attributes: ["id", "name", "email", "role", "active"],
+          where: req.schoolId ? { schoolId: req.schoolId } : undefined,
         },
       ],
       order: [["created_at", "DESC"]],
@@ -40,8 +46,9 @@ async function getLogAuditById(req, res) {
         {
           model: User,
           as: "user",
-          required: false,
-          attributes: ["id", "nome", "email", "role", "ativo"],
+          required: Boolean(req.schoolId),
+          attributes: ["id", "name", "email", "role", "active"],
+          where: req.schoolId ? { schoolId: req.schoolId } : undefined,
         },
       ],
     });

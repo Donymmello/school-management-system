@@ -62,7 +62,7 @@ async function registerSchool(req, res) {
           slug,
           plan: plan || "FREE",
           academicModel,
-          currency: currencyValue || "AOA",
+          currency: currencyValue || "MZN",
           status: "ACTIVE",
         },
         { transaction: t }
@@ -202,7 +202,24 @@ async function updateSchool(req, res) {
     const school = await School.findByPk(req.params.id);
     if (!school) return res.status(404).json({ message: "School not found." });
 
-    const { name, address, email, logo, plan, status, currency } = req.body;
+    // Checagem de posse: ADMIN só edita a própria escola (a rota já
+    // liberou ADMIN além de SUPER_ADMIN, ver routes/schools.routes.js —
+    // antes só SUPER_ADMIN chegava aqui, mesmo o comentário da rota já
+    // falando em "a própria escola pode editar", inconsistência corrigida
+    // na Fase 8, ver docs/project-rules.md, seção 6). Mesmo padrão de
+    // ownership já usado em getSchoolById.
+    if (req.user.role !== "SUPER_ADMIN" && req.user.schoolId !== school.id) {
+      return res.status(403).json({ message: "Access denied." });
+    }
+
+    const { name, address, email, logo, plan, status, currency, paymentEntity } = req.body;
+
+    // plan/status são decisões de billing da plataforma — só SUPER_ADMIN
+    // mexe nisso, mesmo quando a rota já libera ADMIN pra editar o resto
+    // dos próprios dados da escola.
+    if (req.user.role !== "SUPER_ADMIN" && (plan !== undefined || status !== undefined)) {
+      return res.status(403).json({ message: "Only the platform administrator can change plan or status." });
+    }
 
     let currencyValue;
     if (currency !== undefined) {
@@ -219,6 +236,12 @@ async function updateSchool(req, res) {
       plan: plan ?? school.plan,
       status: status ?? school.status,
       currency: currencyValue ?? school.currency,
+      // "in req.body" em vez de "??": paymentEntity precisa poder ser
+      // apagado de propósito (voltar a null se a escola quiser desativar a
+      // referência de pagamento), e "null ?? school.paymentEntity" ignoraria
+      // esse null silenciosamente (mesmo cuidado documentado na revisão de
+      // código da Fase 1-5, ver docs/project-rules.md, seção 6).
+      paymentEntity: "paymentEntity" in req.body ? paymentEntity : school.paymentEntity,
     });
 
     return res.status(200).json({ message: "School updated successfully.", school });

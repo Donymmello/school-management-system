@@ -1,7 +1,7 @@
 import apiClient from "./client.js";
 
-export async function listEnrollments() {
-  const { data } = await apiClient.get("/enrollments");
+export async function listEnrollments(params) {
+  const { data } = await apiClient.get("/enrollments", { params });
   return data;
 }
 

@@ -29,7 +29,8 @@ const emptyForm = {
   plan: "FREE",
   academicModel: "",
   status: "ACTIVE",
-  currency: "AOA",
+  currency: "MZN",
+  paymentEntity: "",
 };
 
 // school === null → modo criação. school preenchido → modo edição (slug não
@@ -53,7 +54,8 @@ export default function SchoolFormDialog({ open, school, onClose, onSaved }) {
             plan: school.plan || "FREE",
             academicModel: school.academicModel || "",
             status: school.status || "ACTIVE",
-            currency: school.currency || "AOA",
+            currency: school.currency || "MZN",
+            paymentEntity: school.paymentEntity || "",
           }
         : emptyForm
     );
@@ -73,8 +75,16 @@ export default function SchoolFormDialog({ open, school, onClose, onSaved }) {
     setSubmitting(true);
     try {
       if (isEditing) {
-        const { name, address, email, plan, status, currency } = form;
-        await updateSchool(school.id, { name, address, email, plan, status, currency });
+        const { name, address, email, plan, status, currency, paymentEntity } = form;
+        await updateSchool(school.id, {
+          name,
+          address,
+          email,
+          plan,
+          status,
+          currency,
+          paymentEntity: paymentEntity || null,
+        });
       } else {
         const { name, address, email, slug, plan, academicModel, currency } = form;
         await createSchool({ name, address, email, slug, plan, academicModel, currency });
@@ -186,9 +196,20 @@ export default function SchoolFormDialog({ open, school, onClose, onSaved }) {
                 fullWidth
                 required
                 inputProps={{ maxLength: 3, style: { textTransform: "uppercase" } }}
-                helperText='Código de 3 letras, ex: "AOA", "USD", "BRL"'
+                helperText='Código de 3 letras, ex: "MZN" (Metical), "USD", "AOA" (Kwanza)'
               />
             </Grid>
+            {isEditing && (
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Entidade de pagamento"
+                  value={form.paymentEntity}
+                  onChange={handleChange("paymentEntity")}
+                  fullWidth
+                  helperText='Código que a escola usa/divulga junto com a referência de cada propina (ex: "12345"). Deixe em branco pra não gerar entidade.'
+                />
+              </Grid>
+            )}
             {isEditing && (
               <Grid item xs={12} sm={6}>
                 <TextField

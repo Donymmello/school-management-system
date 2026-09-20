@@ -7,12 +7,14 @@ import {
   IconButton,
   Paper,
   Skeleton,
+  Snackbar,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -21,6 +23,7 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import UndoIcon from "@mui/icons-material/Undo";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { deleteFee, listFees, markFeeStatus } from "../../api/fees.js";
 import { getErrorMessage } from "../../api/errors.js";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -38,10 +41,52 @@ function isOverdue(fee) {
   return new Date(fee.dueDate) < new Date(new Date().toDateString());
 }
 
+// Fase 8: quando paga, mostra como/por quem foi confirmada (MANUAL sempre
+// tem confirmedBy; WEBHOOK ainda não é usado por nenhum gateway real neste
+// sistema, mas o campo já existe — ver backend/services/feePayment.service.js).
 function statusChip(fee) {
-  if (fee.status === "PAID") return <Chip size="small" label="Pago" color="success" variant="outlined" />;
+  if (fee.status === "PAID") {
+    const confirmedLabel =
+      fee.paymentMethod === "WEBHOOK"
+        ? "Confirmado automaticamente via webhook"
+        : fee.confirmedBy?.name
+        ? `Confirmado por ${fee.confirmedBy.name}`
+        : "Confirmado manualmente";
+    return (
+      <Tooltip title={confirmedLabel}>
+        <Chip size="small" label="Pago" color="success" variant="outlined" />
+      </Tooltip>
+    );
+  }
   if (isOverdue(fee)) return <Chip size="small" label="Atrasado" color="error" variant="outlined" />;
   return <Chip size="small" label="Pendente" color="warning" variant="outlined" />;
+}
+
+// Fase 8: entidade+referência de pagamento (ver docs/project-rules.md,
+// seção 6) — propinas lançadas antes desta fase não têm reference (coluna
+// nova, ficou null nas linhas antigas), daí o fallback "—".
+function PaymentReferenceCell({ fee, onCopy }) {
+  if (!fee.reference) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        —
+      </Typography>
+    );
+  }
+
+  const label = fee.entity ? `Entidade ${fee.entity} · Ref ${fee.reference}` : `Ref ${fee.reference}`;
+  const copyText = fee.entity ? `Entidade: ${fee.entity}\nReferência: ${fee.reference}` : fee.reference;
+
+  return (
+    <Box display="flex" alignItems="center" gap={0.5}>
+      <Typography variant="body2">{label}</Typography>
+      <Tooltip title="Copiar referência">
+        <IconButton size="small" onClick={() => onCopy(copyText)}>
+          <ContentCopyIcon fontSize="inherit" />
+        </IconButton>
+      </Tooltip>
+    </Box>
+  );
 }
 
 export default function FeesListPage() {
@@ -61,6 +106,14 @@ export default function FeesListPage() {
   const [deletingFee, setDeletingFee] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
+  const [copiedMessage, setCopiedMessage] = useState(null);
+
+  function handleCopyReference(text) {
+    navigator.clipboard?.writeText(text).then(
+      () => setCopiedMessage("Referência copiada."),
+      () => setCopiedMessage("Não foi possível copiar. Copie manualmente.")
+    );
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -119,7 +172,7 @@ export default function FeesListPage() {
     }
   }
 
-  const colCount = readOnly ? 5 : 6;
+  const colCount = readOnly ? 6 : 7;
 
   return (
     <Box>
@@ -148,6 +201,7 @@ export default function FeesListPage() {
               <TableCell>Descrição</TableCell>
               <TableCell>Valor</TableCell>
               <TableCell>Vencimento</TableCell>
+              <TableCell>Referência</TableCell>
               <TableCell>Status</TableCell>
               {!readOnly && <TableCell align="right">Ações</TableCell>}
             </TableRow>
@@ -191,6 +245,9 @@ export default function FeesListPage() {
                     {Number(fee.amount).toFixed(2)} {fee.currency}
                   </TableCell>
                   <TableCell>{fee.dueDate}</TableCell>
+                  <TableCell>
+                    <PaymentReferenceCell fee={fee} onCopy={handleCopyReference} />
+                  </TableCell>
                   <TableCell>{statusChip(fee)}</TableCell>
                   {!readOnly && (
                     <TableCell align="right">
@@ -245,6 +302,13 @@ export default function FeesListPage() {
         loading={deleting}
         onConfirm={handleDeleteConfirm}
         onClose={() => setDeletingFee(null)}
+      />
+
+      <Snackbar
+        open={Boolean(copiedMessage)}
+        autoHideDuration={2500}
+        onClose={() => setCopiedMessage(null)}
+        message={copiedMessage}
       />
     </Box>
   );

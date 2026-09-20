@@ -75,7 +75,12 @@ export default function LoginPage() {
         >
           {submitting ? "Entrando…" : "Entrar"}
         </Button>
-        <Box sx={{ mt: 2, textAlign: "center" }}>
+        <Box sx={{ mt: 1.5, textAlign: "center" }}>
+          <Link component={RouterLink} to="/esqueci-senha" variant="body2">
+            Esqueci minha senha
+          </Link>
+        </Box>
+        <Box sx={{ mt: 1.5, textAlign: "center" }}>
           <Link component={RouterLink} to="/registrar-escola" variant="body2">
             Sua escola ainda não tem conta? Cadastre-se
           </Link>

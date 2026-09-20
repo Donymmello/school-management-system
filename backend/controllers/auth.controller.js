@@ -2,10 +2,11 @@ const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const { Op } = require("sequelize");
-const { User, Student, Teacher, Staff, School, PasswordResetToken, sequelize } = require("../models");
+const { User, Student, Teacher, Staff, School, Turma, PasswordResetToken, sequelize } = require("../models");
 const { generateStudentCode, generateEmployeeCode } = require("../utils/generateCode");
 const registerLogAudit = require("../utils/logAudit");
 const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
+const sendEmail = require("../utils/email");
 
 const generateToken = (user) => {
   return jwt.sign(
@@ -115,6 +116,7 @@ const registerUser = async (req, res) => {
       position,
       department,
       subject,
+      turmaId,
     } = req.body;
 
     if (!req.user || !["ADMIN", "SUPER_ADMIN"].includes(req.user.role)) {
@@ -189,6 +191,14 @@ const registerUser = async (req, res) => {
       return res.status(409).json({ message: "A student with this ID number already exists." });
     }
 
+    // Turma pedagógica (SECONDARY) — ver docs/project-rules.md, seção 6
+    // (fase 6 do roadmap de execução). Opcional: nada impede cadastrar o
+    // aluno sem turma ainda e atribuir depois via updateStudent.
+    if (role === "STUDENT" && turmaId) {
+      const turma = await Turma.findOne({ where: { id: turmaId, schoolId } });
+      if (!turma) return res.status(404).json({ message: "Turma not found in this school." });
+    }
+
     const passwordHash = await bcrypt.hash(password, 10);
     const employeeCode = role === "STUDENT" ? null : await generateEmployeeCode();
 
@@ -224,6 +234,7 @@ const registerUser = async (req, res) => {
             telephone: telephone || null,
             idCard: idCard || null,
             idNumber: idNumber || null,
+            turmaId: turmaId || null,
           },
           { transaction: t }
         );
@@ -444,6 +455,23 @@ const login = async (req, res) => {
       });
     }
 
+    // IMPORTANTE: valida a senha ANTES de revelar qualquer coisa sobre o
+    // status da conta (ativo/inativo, escola ativa/inativa). Checar esses
+    // status antes da senha era um bug de segurança real — permitia que
+    // qualquer um, sem saber a senha, descobrisse se um email cadastrado
+    // pertence a uma conta desativada ou a uma escola suspensa, só
+    // chamando /auth/login com esse email e uma senha qualquer (oracle de
+    // enumeração de contas). Com a senha validada primeiro, uma tentativa
+    // sem a senha correta sempre cai no 401 genérico, exista a conta ativa
+    // ou não.
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        message: "Invalid password.",
+      });
+    }
+
     if (!user.active) {
       return res.status(403).json({
         message: "User is inactive. Contact the administrator.",
@@ -456,14 +484,6 @@ const login = async (req, res) => {
     if (user.school && user.school.status !== "ACTIVE") {
       return res.status(403).json({
         message: "This school's account is not active. Contact the platform administrator.",
-      });
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        message: "Invalid password.",
       });
     }
 
@@ -568,10 +588,14 @@ const forgotPassword = async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ message: "Email é obrigatório." });
 
-    const user = await User.findOne({ where: { email }, attributes: ["id"] });
+    const user = await User.findOne({ where: { email }, attributes: ["id", "name", "email"] });
+
+    // Mensagem genérica sempre igual, exista o email ou não — não dá pra
+    // usar isso pra descobrir se um email está cadastrado no sistema.
+    const genericResponse = { message: "Se o email existir, receberá instruções para redefinição." };
 
     if (!user) {
-      return res.status(200).json({ message: "Se o email existir, receberá instruções para redefinição." });
+      return res.status(200).json(genericResponse);
     }
 
     const token = crypto.randomBytes(20).toString("hex");
@@ -579,10 +603,26 @@ const forgotPassword = async (req, res) => {
 
     await PasswordResetToken.create({ userId: user.id, token, expiresAt });
 
-    const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
-    console.log(`[DEV ONLY] Link de Reset: ${resetLink}`);
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const resetLink = `${frontendUrl}/redefinir-senha?token=${token}`;
 
-    return res.status(200).json({ message: "Se o email existir, receberá instruções para redefinição." });
+    try {
+      await sendEmail(
+        user.email,
+        "Redefinição de senha",
+        `Olá, ${user.name}.\n\nRecebemos um pedido para redefinir a sua senha. Clique no link abaixo (válido por 15 minutos):\n\n${resetLink}\n\nSe não foi você quem pediu, pode ignorar este email.`
+      );
+    } catch (emailError) {
+      // sendEmail() depende de EMAIL_USER/EMAIL_PASS (Gmail via nodemailer,
+      // ver backend/utils/email.js) — se não estiver configurado (ex: dev
+      // local sem essas credenciais), não derruba o pedido: cai pro
+      // console.log de dev que já existia antes, pra não bloquear teste
+      // local sem conta de email de verdade.
+      console.error("[ForgotPassword] Falha ao enviar email, caindo para log de dev:", emailError.message);
+      console.log(`[DEV ONLY] Link de Reset: ${resetLink}`);
+    }
+
+    return res.status(200).json(genericResponse);
   } catch (error) {
     console.error("[ForgotPassword Error]:", error);
     return res.status(500).json({ message: "Erro interno." });
@@ -606,6 +646,17 @@ const resetPassword = async (req, res) => {
       await User.update({ passwordHash: hashedPassword }, { where: { id: resetToken.userId }, transaction: t });
       resetToken.used = true;
       await resetToken.save({ transaction: t });
+
+      await registerLogAudit(
+        {
+          userId: resetToken.userId,
+          action: "UPDATE",
+          entity: "User",
+          entityId: resetToken.userId,
+          description: "Password redefinida via fluxo de esqueci minha senha.",
+        },
+        { transaction: t }
+      );
     });
 
     return res.status(200).json({ message: "Password redefinida com sucesso." });
