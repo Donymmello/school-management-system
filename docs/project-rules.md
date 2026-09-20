@@ -155,10 +155,22 @@ StudentAssessment, Grade, Attendance, Fee, AcademicPolicy).**
   pode ver todas as escolas ou filtrar via `?schoolId=`.
 - Helper `utils/tenantScope.js` (`tenantWhere`) usado em todas as queries de
   student/course/classroom/subject controllers, e no `create()` de cada um.
-- `classroom.code`/`classroom.name` e `subject.code`/`subject.name` são únicos
-  **por escola** (`school_id + code`, `school_id + name`), declarados em
-  `indexes` no nível do modelo. Esta linha afirmou durante muito tempo que
-  assim era sem que fosse verdade — ver o bug abaixo.
+- `classroom.code`/`classroom.name`, `subject.code`/`subject.name` e
+  `student.id_number` são únicos **por escola** (`school_id + <coluna>`),
+  declarados em `indexes` no nível do modelo. Esta linha afirmou durante muito
+  tempo que assim era sem que fosse verdade — ver o bug abaixo.
+- `student.id_card` deixou de ser um número e passou a ser o **tipo** do
+  documento (`BI`, `PASSPORT`, `OTHER`), com `validate: { isIn }` no modelo e
+  selector no formulário; o número vive em `student.id_number`. Os dois campos
+  existiam com rótulos ambíguos ("Documento de identidade" e "Número de
+  identificação"), ambos texto livre. `id_card` **perdeu o `unique`**: fazia
+  algum sentido enquanto guardava um número, mas como tipo significaria que uma
+  única pessoa em toda a plataforma poderia ter "BI". `id_number` era igualmente
+  único global e passou a ser por escola — a mesma pessoa pode inscrever-se em
+  duas escolas da plataforma. Lista de tipos guardada como `STRING` e não como
+  `ENUM` de propósito: no PostgreSQL acrescentar um valor a um `ENUM` exige
+  `ALTER TYPE`, e espera-se que a lista cresça (cédula, DIRE, carta de
+  condução).
 - `School` ganhou CRUD mínimo (`controllers/school.controller.js`,
   `routes/schools.routes.js`) — só `SUPER_ADMIN` cria/lista escolas.
 - `POST /api/auth/bootstrap-admin` agora cria o `SUPER_ADMIN` (dono da plataforma, sem
@@ -334,6 +346,45 @@ fielmente o que o modelo pedia. A migração não causou o bug — revelou-o. Va
 como aviso geral: qualquer outra divergência entre o modelo e o schema legado
 do MySQL vai aparecer da mesma maneira, na primeira vez que a tabela nascer
 limpa.
+
+**Semântica de erro dentro de transaction — diferença real entre MySQL e
+PostgreSQL, apanhada a investigar um 500 que nunca chegou a ser
+diagnosticado.** `utils/logAudit.js registerLogAudit` engolia o erro de
+`LogAudit.create` em qualquer caso, inclusive quando o caller lhe passava uma
+transaction. Isso é defensável fora de uma transaction, onde a auditoria é
+acessória. Dentro de uma, no PostgreSQL, é pior que inútil: **um comando
+falhado aborta a transaction inteira** e todos os seguintes devolvem `current
+transaction is aborted, commands ignored until end of transaction block`. O
+caller continua a correr às cegas e só rebenta no COMMIT, com um erro que não
+é de constraint única e por isso cai no `catch` genérico — 500 opaco, sem
+relação visível com a causa. No MySQL isto passava despercebido porque lá um
+comando falhado não contamina os seguintes.
+
+Corrigido: relança quando `options.transaction` existe, mantém o engolir quando
+não existe. São 21 call sites, 4 com transaction (registo de utilizador,
+redefinição de palavra-passe, matrícula). Mantém também a simetria com a
+decisão já documentada nesse ficheiro: se a operação reverte, o log não fica
+gravado; se o log falha, a operação reverte.
+
+Registado também que **`SequelizeValidationError` não era apanhado em lado
+nenhum** e caía no `catch` genérico: 500 quando a culpa é do pedido. Já havia
+ali um 500 latente pelo `validate: { isEmail }` de `User.email`.
+`utils/dbErrors.js` ganhou `isValidationError`/`respondValidationError` (400),
+ligados ao `errorTreatment` de `student.controller.js` e ao `catch` de
+`registerUser`.
+
+**O 500 original ao registar aluno ficou sem causa identificada.** Desapareceu
+depois de várias mudanças simultâneas (constraints, modelos, reinício do
+backend) e o log perdeu-se ao recriar o container. A correção da validação
+acima quase de certeza **não** é a explicação: transforma 500 em 400, não em
+sucesso. Fica por escrito como dívida em aberto, não como resolvido.
+
+**Observabilidade — razão de o log se ter perdido, não corrigido:** os
+controllers usam `console.error`, que vive e morre com o container. O projeto
+tem `utils/logger.js` (JSON estruturado, `LOG_TO_FILE` a escrever em
+`backend/logs/`, pasta bind-mounted que sobreviveria a recriar o container) e
+**nenhum controller o usa** — só o `config/databaseSync.js`. Enquanto for
+assim, qualquer erro desaparece no próximo `docker compose up --build`.
 
 **Fica em aberto, decisão de negócio, não mexido:** `Course.code` e
 `CourseOffering.code` têm `unique: true`, ou seja, são únicos globalmente — se a
