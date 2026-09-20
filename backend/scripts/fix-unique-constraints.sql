@@ -14,19 +14,57 @@
 
 BEGIN;
 
--- 1. Largar as constraints erradas. IF EXISTS: se o nome não bater (base
---    criada por outra versão do modelo), a linha é um no-op em vez de erro.
---    A verificação no fim mostra o estado real.
-ALTER TABLE subjects   DROP CONSTRAINT IF EXISTS "subjects_schoolId_unique";
-ALTER TABLE subjects   DROP CONSTRAINT IF EXISTS "subject_school_name";
-ALTER TABLE subjects   DROP CONSTRAINT IF EXISTS "subject_school_code";
+-- 1. Largar a unicidade errada. Procura pelas COLUNAS e não por nomes: a
+--    primeira versão deste script adivinhava nomes à maneira do Sequelize
+--    (`students_idCard_unique`) e falhou em silêncio, porque para um
+--    `unique: true` de coluna o Sequelize emite o UNIQUE inline no CREATE
+--    TABLE sem lhe dar nome e quem nomeia é o PostgreSQL, com o seu padrão
+--    `<tabela>_<coluna>_key`.
+--
+--    Trata os dois casos: unicidade que existe como CONSTRAINT (nascida de um
+--    UNIQUE no CREATE TABLE) e como ÍNDICE solto (nascida de um addIndex).
+--
+--    Só larga conjuntos de UMA coluna e só os errados. As compostas criadas
+--    mais abaixo têm duas colunas e nunca casam. student_code, user_id e as
+--    chaves primárias também não casam, logo ficam intactas.
+DO $$
+DECLARE
+  r   record;
+  con text;
+BEGIN
+  FOR r IN
+    SELECT i.indexrelid::regclass::text     AS idx,
+           t.relname                        AS tbl,
+           -- ::text obrigatório: attname é do tipo `name`, e name[] não compara
+           -- com os literais text[] do IF abaixo
+           array_agg(a.attname::text ORDER BY a.attname::text) AS cols
+      FROM pg_index i
+      JOIN pg_class t     ON t.oid = i.indrelid
+      JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
+     WHERE i.indisunique
+       AND NOT i.indisprimary
+       AND t.relname IN ('subjects', 'classrooms', 'students')
+     GROUP BY i.indexrelid, t.relname
+  LOOP
+    IF (r.tbl::text IN ('subjects', 'classrooms')
+        AND r.cols IN (ARRAY['school_id'], ARRAY['name'], ARRAY['code']))
+       OR (r.tbl::text = 'students'
+        AND r.cols IN (ARRAY['id_card'], ARRAY['id_number']))
+    THEN
+      SELECT c.conname INTO con
+        FROM pg_constraint c
+       WHERE c.conindid = r.idx::regclass AND c.contype = 'u';
 
-ALTER TABLE classrooms DROP CONSTRAINT IF EXISTS "classrooms_schoolId_unique";
-ALTER TABLE classrooms DROP CONSTRAINT IF EXISTS "classroom_school_name";
-ALTER TABLE classrooms DROP CONSTRAINT IF EXISTS "classroom_school_code";
+      IF con IS NOT NULL THEN
+        EXECUTE format('ALTER TABLE %I DROP CONSTRAINT %I', r.tbl, con);
+      ELSE
+        EXECUTE format('DROP INDEX %I', r.idx);
+      END IF;
 
-ALTER TABLE students   DROP CONSTRAINT IF EXISTS "students_idCard_unique";
-ALTER TABLE students   DROP CONSTRAINT IF EXISTS "students_idNumber_unique";
+      RAISE NOTICE 'largada unicidade em %(%)', r.tbl, array_to_string(r.cols, ',');
+    END IF;
+  END LOOP;
+END $$;
 
 -- 2. Normalizar id_card: passou a guardar o TIPO de documento, não o número.
 --    Qualquer valor legado que não seja um dos códigos aceites vai para NULL,
