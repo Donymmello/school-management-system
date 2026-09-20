@@ -392,6 +392,51 @@ escola A usar `ENG101`, a escola B não o pode usar. Pode ser intencional ou ser
 o mesmo descuido. `Fee.reference` também é global e esse parece correto: uma
 referência de pagamento não deve colidir entre escolas.
 
+**Colunas em camelCase como marcador de associações mortas.** Quatro colunas
+destoavam de um schema todo em snake_case: `subjects."courseId"`,
+`students."courseId"`, `course_offering_subjects."classroomId"` e
+`enrollments."approvedBy"`. Não era questão de estilo. Quando `models/index.js`
+declara `foreignKey: "x"` e o modelo **não** tem esse atributo, o Sequelize
+cria-o e, sem `field:`, usa o nome tal e qual como nome de coluna. Prova por
+contraste: `CourseOffering.courseId` e `Schedule.classroomId` declaram
+`field:` e ficaram em snake_case.
+
+Três dessas associações nunca foram usadas por nenhum controller nem tiveram
+uma linha preenchida, e foram removidas:
+
+- `Student ↔ Course`. O vínculo real é `Enrollment -> CourseOffering ->
+  Course`. Já estava assinalada como morta num comentário em
+  `student.controller.js`.
+- `Course ↔ Subject`. Redundante por desenho — uma disciplina liga-se a um
+  curso via `CourseOfferingSubject`, a relação muitos-para-muitos de verdade.
+- `Classroom ↔ CourseOfferingSubject`. A sala pertence ao `Schedule`, não à
+  disciplina: a mesma disciplina dá-se em salas diferentes conforme o horário.
+
+**A quarta era um bug silencioso, e é a parte que interessa guardar.**
+`models/enrollment.js` declarava o atributo como `aprovedBy` — um "p" — com
+`field: "approved_by"`, enquanto a associação usava `foreignKey: "approvedBy"`.
+Como não casavam, o Sequelize criava um **segundo** atributo, com coluna
+`"approvedBy"`. Existiam portanto duas colunas para o mesmo conceito: o
+controller escrevia na inventada e a `approved_by`, aquela que o modelo julgava
+estar a usar, ficava permanentemente vazia. Qualquer leitura de `approved_by`
+pelo modelo devolveria sempre nulo, sem erro em lado nenhum. Corrigida a
+grafia, o atributo aponta para `approved_by` e a coluna inventada saiu.
+
+`backend/scripts/drop-orphan-columns.sql` larga as quatro, recusando-se a
+largar qualquer uma que tenha dados. Aplicado e verificado: a consulta de
+camelCase sobre `information_schema` devolve zero linhas.
+
+**Regra que fica:** um `foreignKey` numa associação deve ter sempre o atributo
+correspondente declarado no modelo, com `field:` em snake_case. Uma coluna em
+camelCase neste schema é sinal de que isso não foi feito — e, como se viu, ou
+a associação está morta ou há uma coluna duplicada a esconder-se atrás dela.
+A consulta que as encontra todas:
+
+```sql
+SELECT table_name, column_name FROM information_schema.columns
+ WHERE table_schema = 'public' AND column_name ~ '[a-z][A-Z]';
+```
+
 **Pendências conhecidas:**
 
 - `registerStudent` (auto-cadastro público) pede `schoolId` cru no body — não tem
