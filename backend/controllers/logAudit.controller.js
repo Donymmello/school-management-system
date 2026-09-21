@@ -1,4 +1,5 @@
 const { LogAudit, User } = require("../models");
+const logger = require("../utils/logger");
 
 
 async function getAllLogsAudit(req, res) {
@@ -23,7 +24,7 @@ async function getAllLogsAudit(req, res) {
 
     return res.status(200).json(logs);
   } catch (error) {
-    console.error("Error to list logs of audit:", error);
+    logger.requestError("Error to list logs of audit", req, error);
 
     return res.status(500).json({
       message: "Error occurred while listing audit logs.",
@@ -61,7 +62,7 @@ async function getLogAuditById(req, res) {
 
     return res.status(200).json(log);
   } catch (error) {
-    console.error("Error to find audit log:", error);
+    logger.requestError("Error to find audit log", req, error);
 
     return res.status(500).json({
       message: "Error occurred while finding audit log.",
@@ -86,7 +87,7 @@ async function getMyAudits(req, res) {
 
     return res.status(200).json(logs);
   } catch (error) {
-    console.error("Error to list my audit logs:", error);
+    logger.requestError("Error to list my audit logs", req, error);
 
     return res.status(500).json({
       message: "Error occurred while listing my audit logs.",

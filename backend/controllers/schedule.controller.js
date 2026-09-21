@@ -10,6 +10,7 @@ const {
 const { Op } = require('sequelize');
 const { tenantWhere } = require('../utils/tenantScope');
 const { resolveOwnStudentId } = require('../utils/selfScope');
+const logger = require("../utils/logger");
 
 // Schedule não tem schoolId próprio (ver docs/project-rules.md, seção 5) — o
 // isolamento por escola é feito via join obrigatório em
@@ -125,10 +126,7 @@ async function createSchedule(req, res) {
             schedule,
         });
     } catch (error) {
-        console.error(
-            "Error creating schedule:",
-            error
-        );
+        logger.requestError("Error creating schedule", req, error);
 
         return res.status(500).json({
             message:

@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const logger = require("../utils/logger");
 
 /**
  * MIDDLEWARE DE AUTENTICAÇÃO
@@ -37,7 +38,7 @@ const authMiddleware = (req, res, next) => {
     return next();
   } catch (error) {
     // Segurança Senior: Logs internos para a equipa, mensagens genéricas para o cliente
-    console.error("[AuthMiddleware Error]:", error.message);
+    logger.requestError("[AuthMiddleware Error]", req, error);
     return res.status(401).json({ message: "Token inválido ou expirado." });
   }
 };

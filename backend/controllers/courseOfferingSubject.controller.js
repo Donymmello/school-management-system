@@ -7,6 +7,7 @@ const {
 } = require('../models');
 const { tenantWhere } = require('../utils/tenantScope');
 const { isUniqueConstraintError, respondUniqueConstraint } = require('../utils/dbErrors');
+const logger = require("../utils/logger");
 
 // CourseOfferingSubject não tem schoolId próprio (ver docs/project-rules.md,
 // seção 5) — o isolamento por escola é feito via join obrigatório no
@@ -67,7 +68,7 @@ async function createCourseOfferingSubject(req, res) {
         });
     } catch (error) {
         if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
-        console.error(error);
+        logger.requestError("[Error creating course offering subject]", req, error);
 
         return res.status(500).json({
             message: "An error occurred while assigning the subject to the course offering.",

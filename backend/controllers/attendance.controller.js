@@ -3,6 +3,7 @@ const registerLogAudit = require("../utils/logAudit");
 const { tenantWhere, studentWhere } = require("../utils/tenantScope");
 const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
 const { resolveOwnStudentId } = require("../utils/selfScope");
+const logger = require("../utils/logger");
 
 const ALLOWED_STATUSES = ["PRESENT", "ABSENT", "LATE", "JUSTIFIED"];
 
@@ -58,7 +59,7 @@ async function createAttendance(req, res) {
     if (isUniqueConstraintError(error)) {
       return res.status(409).json({ message: "Attendance for this student on this date already exists." });
     }
-    console.error("[Error creating attendance]:", error);
+    logger.requestError("[Error creating attendance]", req, error);
     return res.status(500).json({ message: "An error occurred while recording attendance." });
   }
 }
@@ -88,7 +89,7 @@ async function getAllAttendance(req, res) {
 
     return res.status(200).json(records);
   } catch (error) {
-    console.error("[Error fetching attendance]:", error);
+    logger.requestError("[Error fetching attendance]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching attendance." });
   }
 }
@@ -103,7 +104,7 @@ async function getAttendanceById(req, res) {
     if (!record) return res.status(404).json({ message: "Attendance record not found." });
     return res.status(200).json(record);
   } catch (error) {
-    console.error("[Error fetching attendance record]:", error);
+    logger.requestError("[Error fetching attendance record]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching the attendance record." });
   }
 }
@@ -132,7 +133,7 @@ async function updateAttendance(req, res) {
     if (isUniqueConstraintError(error)) {
       return res.status(409).json({ message: "Attendance for this student on this date already exists." });
     }
-    console.error("[Error updating attendance]:", error);
+    logger.requestError("[Error updating attendance]", req, error);
     return res.status(500).json({ message: "An error occurred while updating attendance." });
   }
 }
@@ -148,7 +149,7 @@ async function deleteAttendance(req, res) {
     await record.destroy();
     return res.status(200).json({ message: "Attendance record deleted successfully." });
   } catch (error) {
-    console.error("[Error deleting attendance]:", error);
+    logger.requestError("[Error deleting attendance]", req, error);
     return res.status(500).json({ message: "An error occurred while deleting the attendance record." });
   }
 }

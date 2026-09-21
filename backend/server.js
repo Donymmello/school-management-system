@@ -31,6 +31,7 @@ const academicPolicyRoutes = require('./routes/academicPolicies.routes');
 const feeRoutes = require('./routes/fees.routes');
 const feeWebhookRoutes = require('./routes/feeWebhook.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
+const logger = require("./utils/logger");
 //const emailRoutes = require('./routes/emails');
 
 const app = express();
@@ -90,7 +91,7 @@ async function startServer() {
       console.log(`Server running on http://localhost:${PORT}`);
     });
   } catch (error) {
-    console.error("Error starting server:", error);
+    logger.error("Error starting server", { error: error?.message, stack: error?.stack });
   }
 }
 

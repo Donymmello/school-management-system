@@ -1,6 +1,7 @@
 const { Op } = require("sequelize");
 const { TurmaSchedule, TurmaSubject, Turma, Classroom, Subject, Teacher, Student } = require("../models");
 const { tenantWhere } = require("../utils/tenantScope");
+const logger = require("../utils/logger");
 
 // Horário de Turma (Fase 9a, ver docs/project-rules.md, seção 6) — espelha
 // backend/controllers/schedule.controller.js (HIGHER_ED), adaptado pro
@@ -84,7 +85,7 @@ async function createTurmaSchedule(req, res) {
 
     return res.status(201).json({ message: "Schedule created successfully", schedule });
   } catch (error) {
-    console.error("[Error creating turma schedule]:", error);
+    logger.requestError("[Error creating turma schedule]", req, error);
     return res.status(500).json({ message: "An error occurred while creating the schedule." });
   }
 }
@@ -108,7 +109,7 @@ async function getAllTurmaSchedules(req, res) {
 
     return res.status(200).json(schedules);
   } catch (error) {
-    console.error("[Error fetching turma schedules]:", error);
+    logger.requestError("[Error fetching turma schedules]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching schedules." });
   }
 }
@@ -129,7 +130,7 @@ async function getTurmaScheduleById(req, res) {
     if (!schedule) return res.status(404).json({ message: "Schedule not found" });
     return res.status(200).json(schedule);
   } catch (error) {
-    console.error("[Error fetching turma schedule]:", error);
+    logger.requestError("[Error fetching turma schedule]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching the schedule." });
   }
 }
@@ -163,7 +164,7 @@ async function updateTurmaSchedule(req, res) {
 
     return res.status(200).json({ message: "Schedule updated successfully", schedule });
   } catch (error) {
-    console.error("[Error updating turma schedule]:", error);
+    logger.requestError("[Error updating turma schedule]", req, error);
     return res.status(500).json({ message: "An error occurred while updating the schedule." });
   }
 }
@@ -179,7 +180,7 @@ async function deleteTurmaSchedule(req, res) {
     await schedule.destroy();
     return res.status(200).json({ message: "Schedule deleted successfully" });
   } catch (error) {
-    console.error("[Error deleting turma schedule]:", error);
+    logger.requestError("[Error deleting turma schedule]", req, error);
     return res.status(500).json({ message: "An error occurred while deleting the schedule." });
   }
 }

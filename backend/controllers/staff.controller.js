@@ -2,6 +2,7 @@ const { Staff, User } = require("../models");
 const registerLogAudit = require("../utils/logAudit");
 const { tenantWhere } = require("../utils/tenantScope");
 const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
+const logger = require("../utils/logger");
 
 // Criação de colaborador passa por POST /api/auth/register-user (role STAFF),
 // igual ao padrão de Student/Teacher — cria o User (login) e o Staff juntos.
@@ -15,7 +16,7 @@ async function getAllStaff(req, res) {
     });
     return res.status(200).json(staff);
   } catch (error) {
-    console.error("[Error fetching staff]:", error);
+    logger.requestError("[Error fetching staff]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching staff." });
   }
 }
@@ -30,7 +31,7 @@ async function getStaffById(req, res) {
     if (!staff) return res.status(404).json({ message: "Staff member not found." });
     return res.status(200).json(staff);
   } catch (error) {
-    console.error("[Error fetching staff member]:", error);
+    logger.requestError("[Error fetching staff member]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching the staff member." });
   }
 }
@@ -61,7 +62,7 @@ async function updateStaff(req, res) {
     return res.status(200).json({ message: "Staff member updated successfully.", staff });
   } catch (error) {
     if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
-    console.error("[Error updating staff member]:", error);
+    logger.requestError("[Error updating staff member]", req, error);
     return res.status(500).json({ message: "An error occurred while updating the staff member." });
   }
 }
@@ -83,7 +84,7 @@ async function deleteStaff(req, res) {
 
     return res.status(200).json({ message: "Staff member deleted successfully." });
   } catch (error) {
-    console.error("[Error deleting staff member]:", error);
+    logger.requestError("[Error deleting staff member]", req, error);
     return res.status(500).json({ message: "An error occurred while deleting the staff member." });
   }
 }

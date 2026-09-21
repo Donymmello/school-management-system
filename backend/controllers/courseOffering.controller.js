@@ -2,6 +2,7 @@ const { Course, CourseOffering } = require("../models");
 const generateCourseOfferingCode = require("../utils/generateCourseOfferingCode");
 const { tenantWhere } = require("../utils/tenantScope");
 const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
+const logger = require("../utils/logger");
 
 // CourseOffering não tem schoolId próprio (ver docs/project-rules.md, seção 5)
 // — o isolamento por escola é feito via join obrigatório no Course dono da
@@ -61,7 +62,7 @@ async function createCourseOffering(req, res) {
     });
   } catch (error) {
     if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
-    console.error("Error creating course offering:", error);
+    logger.requestError("Error creating course offering", req, error);
 
     return res.status(500).json({
       message: "An error occurred while creating the course offering.",
@@ -92,7 +93,7 @@ async function getAllCourseOfferings(req, res) {
 
     return res.status(200).json(offerings);
   } catch (error) {
-    console.error("Error fetching course offerings:", error);
+    logger.requestError("Error fetching course offerings", req, error);
     return res.status(500).json({
       message: "An error occurred while fetching course offerings.",
     });
@@ -114,7 +115,7 @@ async function getCourseOfferingById(req, res) {
 
     return res.status(200).json(offering);
   } catch (error) {
-    console.error("Error fetching course offering:", error);
+    logger.requestError("Error fetching course offering", req, error);
     return res.status(500).json({
       message: "An error occurred while fetching the course offering.",
     });
@@ -166,7 +167,7 @@ async function updateCourseOffering(req, res) {
     });
   } catch (error) {
     if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
-    console.error("Error updating course offering:", error);
+    logger.requestError("Error updating course offering", req, error);
     return res.status(500).json({
       message: "An error occurred while updating the course offering.",
     });
@@ -193,7 +194,7 @@ async function deactivateCourseOffering(req, res) {
       offering,
     });
   } catch (error) {
-    console.error("Error deactivating course offering:", error);
+    logger.requestError("Error deactivating course offering", req, error);
     return res.status(500).json({
       message: "An error occurred while deactivating the course offering.",
     });

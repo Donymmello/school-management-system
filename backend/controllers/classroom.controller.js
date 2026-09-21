@@ -2,6 +2,7 @@ const { Classroom } = require("../models");
 const generateClassroomCode = require("../utils/generateClassroomCode");
 const { tenantWhere } = require("../utils/tenantScope");
 const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
+const logger = require("../utils/logger");
 
 const allowedTypes = ["NORMAL", "LAB", "AUDITORIUM", "OFFICE", "OTHER"];
 
@@ -61,7 +62,7 @@ async function createClassroom(req, res) {
     });
   } catch (error) {
     if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
-    console.error("Error creating classroom:", error);
+    logger.requestError("Error creating classroom", req, error);
 
     return res.status(500).json({
       message: "An error occurred while creating the classroom.",
@@ -99,7 +100,7 @@ async function getAllClassrooms(req, res) {
 
     return res.status(200).json(classrooms);
   } catch (error) {
-    console.error("Error fetching classrooms:", error);
+    logger.requestError("Error fetching classrooms", req, error);
 
     return res.status(500).json({
       message: "An error occurred while fetching classrooms.",
@@ -122,7 +123,7 @@ async function getClassroomById(req, res) {
 
     return res.status(200).json(classroom);
   } catch (error) {
-    console.error("Error fetching classroom:", error);
+    logger.requestError("Error fetching classroom", req, error);
 
     return res.status(500).json({
       message: "An error occurred while fetching the classroom.",
@@ -195,7 +196,7 @@ async function updateClassroom(req, res) {
     });
   } catch (error) {
     if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
-    console.error("Error updating classroom:", error);
+    logger.requestError("Error updating classroom", req, error);
 
     return res.status(500).json({
       message: "An error occurred while updating the classroom.",
@@ -225,7 +226,7 @@ async function deactivateClassroom(req, res) {
       classroom,
     });
   } catch (error) {
-    console.error("Error deactivating classroom:", error);
+    logger.requestError("Error deactivating classroom", req, error);
 
     return res.status(500).json({
       message: "An error occurred while deactivating the classroom.",
@@ -252,7 +253,7 @@ async function deleteClassroom(req, res) {
       message: "Classroom deleted successfully.",
     });
   } catch (error) {
-    console.error("Error deleting classroom:", error);
+    logger.requestError("Error deleting classroom", req, error);
 
     return res.status(500).json({
       message: "An error occurred while deleting the classroom.",

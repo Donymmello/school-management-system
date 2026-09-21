@@ -5,6 +5,7 @@ const registerLogAudit = require("../utils/logAudit");
 const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
 const { validateCurrency } = require("../utils/validators");
 const { generateToken, mapUserToResponse } = require("./auth.controller");
+const logger = require("../utils/logger");
 
 const ACADEMIC_MODELS = ["SECONDARY", "HIGHER_ED"];
 
@@ -120,7 +121,7 @@ async function registerSchool(req, res) {
     });
   } catch (error) {
     if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
-    console.error("[Error registering school]:", error);
+    logger.requestError("[Error registering school]", req, error);
     return res.status(500).json({ message: "An error occurred while registering the school." });
   }
 }
@@ -166,7 +167,7 @@ async function createSchool(req, res) {
     return res.status(201).json({ message: "School created successfully.", school });
   } catch (error) {
     if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
-    console.error("[Error creating school]:", error);
+    logger.requestError("[Error creating school]", req, error);
     return res.status(500).json({ message: "An error occurred while creating the school." });
   }
 }
@@ -176,7 +177,7 @@ async function getAllSchools(req, res) {
     const schools = await School.findAll({ order: [["name", "ASC"]] });
     return res.status(200).json(schools);
   } catch (error) {
-    console.error("[Error fetching schools]:", error);
+    logger.requestError("[Error fetching schools]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching schools." });
   }
 }
@@ -192,7 +193,7 @@ async function getSchoolById(req, res) {
 
     return res.status(200).json(school);
   } catch (error) {
-    console.error("[Error fetching school]:", error);
+    logger.requestError("[Error fetching school]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching the school." });
   }
 }
@@ -246,7 +247,7 @@ async function updateSchool(req, res) {
 
     return res.status(200).json({ message: "School updated successfully.", school });
   } catch (error) {
-    console.error("[Error updating school]:", error);
+    logger.requestError("[Error updating school]", req, error);
     return res.status(500).json({ message: "An error occurred while updating the school." });
   }
 }

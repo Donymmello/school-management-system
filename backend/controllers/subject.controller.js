@@ -2,6 +2,7 @@ const { Subject } = require("../models");
 const { generateSubjectCode } = require("../utils/generateCode");
 const { tenantWhere } = require("../utils/tenantScope");
 const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
+const logger = require("../utils/logger");
 
 async function createSubject(req, res) {
   try {
@@ -53,7 +54,7 @@ async function createSubject(req, res) {
     });
   } catch (error) {
     if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
-    console.error("Error creating subject:", error);
+    logger.requestError("Error creating subject", req, error);
 
     return res.status(500).json({
       message: "An error occurred while creating the subject.",
@@ -92,7 +93,7 @@ async function getAllSubjects(req, res) {
 
     return res.status(200).json(filteredSubjects);
   } catch (error) {
-    console.error("Error fetching subjects:", error);
+    logger.requestError("Error fetching subjects", req, error);
 
     return res.status(500).json({
       message: "An error occurred while fetching subjects.",
@@ -115,7 +116,7 @@ async function getSubjectById(req, res) {
 
     return res.status(200).json(subject);
   } catch (error) {
-    console.error("Error fetching subject:", error);
+    logger.requestError("Error fetching subject", req, error);
 
     return res.status(500).json({
       message: "An error occurred while fetching the subject.",
@@ -186,7 +187,7 @@ async function updateSubject(req, res) {
     });
   } catch (error) {
     if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
-    console.error("Error updating subject:", error);
+    logger.requestError("Error updating subject", req, error);
 
     return res.status(500).json({
       message: "An error occurred while updating the subject.",
@@ -216,7 +217,7 @@ async function deactivateSubject(req, res) {
       subject,
     });
   } catch (error) {
-    console.error("Error deactivating subject:", error);
+    logger.requestError("Error deactivating subject", req, error);
 
     return res.status(500).json({
       message: "An error occurred while deactivating the subject.",
@@ -243,7 +244,7 @@ async function deleteSubject(req, res) {
       message: "Subject deleted successfully.",
     });
   } catch (error) {
-    console.error("Error deleting subject:", error);
+    logger.requestError("Error deleting subject", req, error);
 
     return res.status(500).json({
       message: "An error occurred while deleting the subject.",

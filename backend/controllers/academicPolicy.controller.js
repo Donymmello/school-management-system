@@ -1,5 +1,6 @@
 const { AcademicPolicy } = require("../models");
 const { tenantWhere } = require("../utils/tenantScope");
+const logger = require("../utils/logger");
 
 // Uma escola nova já ganha uma política default no registro (ver
 // school.controller.js). Este controller só permite consultar/ajustar.
@@ -16,7 +17,7 @@ async function getActivePolicy(req, res) {
 
     return res.status(200).json(policy);
   } catch (error) {
-    console.error("[Error fetching academic policy]:", error);
+    logger.requestError("[Error fetching academic policy]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching the academic policy." });
   }
 }
@@ -41,7 +42,7 @@ async function updateActivePolicy(req, res) {
 
     return res.status(200).json({ message: "Academic policy updated successfully.", policy });
   } catch (error) {
-    console.error("[Error updating academic policy]:", error);
+    logger.requestError("[Error updating academic policy]", req, error);
     return res.status(500).json({ message: "An error occurred while updating the academic policy." });
   }
 }

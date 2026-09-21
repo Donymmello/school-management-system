@@ -1,4 +1,5 @@
 const { LogAudit } = require("../models");
+const logger = require("./logger");
 
 
 // options.transaction era aceito por vários call sites (registerUser,
@@ -25,7 +26,7 @@ async function registerLogAudit(
       options.transaction ? { transaction: options.transaction } : undefined
     );
   } catch (error) {
-    console.error("Error to register audit log:", error);
+    logger.error("Error to register audit log", { error: error?.message, stack: error?.stack });
 
     // Engolir o erro só é defensável fora de uma transaction, onde a auditoria
     // é mesmo acessória e falhar nela não deve derrubar a operação principal.

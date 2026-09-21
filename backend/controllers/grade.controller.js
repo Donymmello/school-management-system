@@ -3,6 +3,7 @@ const registerLogAudit = require("../utils/logAudit");
 const { tenantWhere, studentWhere } = require("../utils/tenantScope");
 const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
 const { resolveOwnStudentId } = require("../utils/selfScope");
+const logger = require("../utils/logger");
 
 // Grade não tem schoolId próprio (ver docs/project-rules.md, seção 5) — o
 // isolamento por escola é feito via join obrigatório no Student dono do
@@ -72,7 +73,7 @@ async function createGrade(req, res) {
     return res.status(201).json({ message: "Grade recorded successfully.", grade });
   } catch (error) {
     if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
-    console.error("[Error creating grade]:", error);
+    logger.requestError("[Error creating grade]", req, error);
     return res.status(500).json({ message: "An error occurred while recording the grade." });
   }
 }
@@ -105,7 +106,7 @@ async function getAllGrades(req, res) {
 
     return res.status(200).json(grades);
   } catch (error) {
-    console.error("[Error fetching grades]:", error);
+    logger.requestError("[Error fetching grades]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching grades." });
   }
 }
@@ -120,7 +121,7 @@ async function getGradeById(req, res) {
     if (!grade) return res.status(404).json({ message: "Grade not found." });
     return res.status(200).json(grade);
   } catch (error) {
-    console.error("[Error fetching grade]:", error);
+    logger.requestError("[Error fetching grade]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching the grade." });
   }
 }
@@ -143,7 +144,7 @@ async function updateGrade(req, res) {
     return res.status(200).json({ message: "Grade updated successfully.", grade });
   } catch (error) {
     if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
-    console.error("[Error updating grade]:", error);
+    logger.requestError("[Error updating grade]", req, error);
     return res.status(500).json({ message: "An error occurred while updating the grade." });
   }
 }
@@ -159,7 +160,7 @@ async function deleteGrade(req, res) {
     await grade.destroy();
     return res.status(200).json({ message: "Grade deleted successfully." });
   } catch (error) {
-    console.error("[Error deleting grade]:", error);
+    logger.requestError("[Error deleting grade]", req, error);
     return res.status(500).json({ message: "An error occurred while deleting the grade." });
   }
 }

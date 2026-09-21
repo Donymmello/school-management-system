@@ -1,6 +1,7 @@
 const { TurmaSubject, Turma, Subject, Teacher } = require("../models");
 const { tenantWhere } = require("../utils/tenantScope");
 const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
+const logger = require("../utils/logger");
 
 // TurmaSubject não tem schoolId próprio — o isolamento por escola é feito
 // via join obrigatório no Turma dono do registro (turmaId nunca é nulo),
@@ -41,7 +42,7 @@ async function createTurmaSubject(req, res) {
     });
   } catch (error) {
     if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
-    console.error("[Error creating turma subject]:", error);
+    logger.requestError("[Error creating turma subject]", req, error);
     return res.status(500).json({ message: "An error occurred while assigning the subject to the turma." });
   }
 }
@@ -63,7 +64,7 @@ async function getAllTurmaSubjects(req, res) {
 
     return res.status(200).json(data);
   } catch (error) {
-    console.error("[Error fetching turma subjects]:", error);
+    logger.requestError("[Error fetching turma subjects]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching turma subjects." });
   }
 }
@@ -92,7 +93,7 @@ async function updateTurmaSubject(req, res) {
     return res.status(200).json({ message: "Turma subject updated successfully.", data: item });
   } catch (error) {
     if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
-    console.error("[Error updating turma subject]:", error);
+    logger.requestError("[Error updating turma subject]", req, error);
     return res.status(500).json({ message: "An error occurred while updating the turma subject." });
   }
 }
@@ -109,7 +110,7 @@ async function deleteTurmaSubject(req, res) {
     await item.destroy();
     return res.status(200).json({ message: "Turma subject removed successfully." });
   } catch (error) {
-    console.error("[Error deleting turma subject]:", error);
+    logger.requestError("[Error deleting turma subject]", req, error);
     return res.status(500).json({ message: "An error occurred while removing the turma subject." });
   }
 }

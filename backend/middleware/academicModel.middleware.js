@@ -1,4 +1,5 @@
 const { School } = require("../models");
+const logger = require("../utils/logger");
 
 /*
   Bloqueia módulos exclusivos de um modelo acadêmico (ver docs/project-rules.md,
@@ -30,7 +31,7 @@ function requireAcademicModel(model) {
 
       return next();
     } catch (error) {
-      console.error("[requireAcademicModel]:", error);
+      logger.error("[requireAcademicModel]", { error: error?.message, stack: error?.stack });
       return res.status(500).json({ message: "An error occurred while checking the institution type." });
     }
   };

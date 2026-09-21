@@ -1,5 +1,6 @@
 const { Fee } = require("../models");
 const { confirmFeePayment } = require("../services/feePayment.service");
+const logger = require("../utils/logger");
 
 // Ponto de extensão pronto pra um gateway de pagamento real (Fase 8, ver
 // docs/project-rules.md, seção 6) — NENHUM provedor está integrado ainda.
@@ -58,7 +59,7 @@ async function receivePaymentConfirmation(req, res) {
 
     return res.status(200).json({ message: "Payment confirmed.", fee });
   } catch (error) {
-    console.error("[Error processing payment webhook]:", error);
+    logger.requestError("[Error processing payment webhook]", req, error);
     return res.status(500).json({ message: "An error occurred while processing the payment webhook." });
   }
 }

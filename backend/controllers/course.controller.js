@@ -2,6 +2,7 @@ const { Course } = require("../models");
 const generateCourseCode = require("../utils/generateCourseCode");
 const { tenantWhere } = require("../utils/tenantScope");
 const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
+const logger = require("../utils/logger");
 
 async function createCourse(req, res) {
   try {
@@ -53,7 +54,7 @@ async function createCourse(req, res) {
     });
   } catch (error) {
     if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
-    console.error("Error creating course:", error);
+    logger.requestError("Error creating course", req, error);
 
     return res.status(500).json({
       message: "An error occurred while creating the course.",

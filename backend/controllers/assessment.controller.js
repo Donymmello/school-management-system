@@ -7,6 +7,7 @@ const {
 } = require('../models');
 const { tenantWhere } = require('../utils/tenantScope');
 const { validatePositiveNumber } = require('../utils/validators');
+const logger = require("../utils/logger");
 
 const CATEGORY_VALUES = ["CONTINUOUS", "EXAM"];
 const MAX_WEIGHT = 100;
@@ -103,7 +104,7 @@ async function createAssessment(req, res) {
             assessment,
         });
     } catch (error) {
-        console.error(error);
+        logger.requestError("[Error creating assessment]", req, error);
 
         return res.status(500).json({
             message: "An error occurred while creating the assessment.",
@@ -139,7 +140,7 @@ async function getAssessmentById(req, res) {
         if (!assessment) return res.status(404).json({ message: "Assessment not found." });
         return res.status(200).json({ assessment });
     } catch (error) {
-        console.error(error);
+        logger.requestError("[Error fetching assessment]", req, error);
         return res.status(500).json({ message: "An error occurred while fetching the assessment." });
     }
 }
@@ -196,7 +197,7 @@ async function updateAssessment(req, res) {
 
         return res.status(200).json({ message: "Assessment updated successfully.", assessment });
     } catch (error) {
-        console.error(error);
+        logger.requestError("[Error updating assessment]", req, error);
         return res.status(500).json({ message: "An error occurred while updating the assessment." });
     }
 }
@@ -220,7 +221,7 @@ async function deleteAssessment(req, res) {
         await assessment.destroy();
         return res.status(200).json({ message: "Assessment deleted successfully." });
     } catch (error) {
-        console.error(error);
+        logger.requestError("[Error deleting assessment]", req, error);
         return res.status(500).json({ message: "An error occurred while deleting the assessment." });
     }
 }

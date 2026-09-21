@@ -9,6 +9,7 @@ const {
 const { tenantWhere } = require("../utils/tenantScope");
 const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
 const { resolveOwnStudentId } = require("../utils/selfScope");
+const logger = require("../utils/logger");
 
 async function recordScore(req, res) {
     try {
@@ -77,7 +78,7 @@ async function recordScore(req, res) {
         });
     } catch (error) {
         if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
-        console.error("[Error recording score]:", error);
+        logger.requestError("[Error recording score]", req, error);
         return res.status(500).json({
             message: "An error occurred while recording the score.",
         });
@@ -150,7 +151,7 @@ async function getStudentAssessments(req, res) {
 
         return res.status(200).json({ results });
     } catch (error) {
-        console.error("[Error fetching student assessments]:", error);
+        logger.requestError("[Error fetching student assessments]", req, error);
         return res.status(500).json({
             message: "An error occurred while fetching student assessments.",
         });

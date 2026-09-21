@@ -1,5 +1,6 @@
 const { Op, fn, col } = require("sequelize");
 const { Student, Teacher, Staff, Fee, Enrollment, School } = require("../models");
+const logger = require("../utils/logger");
 
 // KPIs pro DashboardHome — antes disso a tela era só um cartão de perfil,
 // sem nenhum número (ver docs/project-rules.md, seção 7, "Painel com
@@ -106,7 +107,7 @@ async function getDashboardSummary(req, res) {
       enrollmentsPendingCount,
     });
   } catch (error) {
-    console.error("[Error building dashboard summary]:", error);
+    logger.requestError("[Error building dashboard summary]", req, error);
     return res.status(500).json({ message: "An error occurred while building the dashboard summary." });
   }
 }
