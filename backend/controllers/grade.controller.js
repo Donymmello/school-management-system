@@ -1,18 +1,21 @@
 const { Grade, Student, Teacher, Subject } = require("../models");
 const registerLogAudit = require("../utils/logAudit");
-const { tenantWhere } = require("../utils/tenantScope");
+const { tenantWhere, studentWhere } = require("../utils/tenantScope");
 const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
 const { resolveOwnStudentId } = require("../utils/selfScope");
 
 // Grade não tem schoolId próprio (ver docs/project-rules.md, seção 5) — o
 // isolamento por escola é feito via join obrigatório no Student dono do
 // registro, igual ao Attendance.
+// required: true faz deste join o filtro de tudo o que passa por aqui — lista,
+// leitura por id, alteração e remoção. Trocar tenantWhere por studentWhere aqui
+// restringe as quatro operações ao professor de uma só vez.
 function studentScope(req, extra = {}) {
   return {
     model: Student,
     as: "student",
     required: true,
-    where: tenantWhere(req, extra),
+    where: studentWhere(req, extra),
     attributes: ["id", "name", "studentCode"],
   };
 }
@@ -25,7 +28,7 @@ const commonIncludes = (req) => [
 
 async function validateRelations(req, { studentId, teacherId, subjectId }) {
   const [student, teacher, subject] = await Promise.all([
-    Student.findOne({ where: tenantWhere(req, { id: studentId }), attributes: ["id"] }),
+    Student.findOne({ where: studentWhere(req, { id: studentId }), attributes: ["id"] }),
     Teacher.findOne({ where: tenantWhere(req, { id: teacherId }), attributes: ["id"] }),
     Subject.findOne({ where: tenantWhere(req, { id: subjectId }), attributes: ["id"] }),
   ]);
@@ -38,7 +41,14 @@ async function validateRelations(req, { studentId, teacherId, subjectId }) {
 
 async function createGrade(req, res) {
   try {
-    const { studentId, teacherId, subjectId, score, term } = req.body;
+    const { studentId, subjectId, score, term } = req.body;
+
+    // TEACHER não escolhe em nome de quem lança: o teacherId é sempre o próprio,
+    // resolvido do token pelo attachTeacherScope. Antes vinha do corpo do
+    // pedido, o que permitia a um professor registar uma nota como se fosse de
+    // outro. Os papéis administrativos continuam a poder indicá-lo — a
+    // secretaria lança notas em nome do professor que as deu.
+    const teacherId = req.user.role === "TEACHER" ? req.teacherId : req.body.teacherId;
 
     if (!studentId || !teacherId || !subjectId || score === undefined || !term) {
       return res.status(400).json({

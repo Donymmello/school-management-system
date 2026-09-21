@@ -14,7 +14,7 @@ const {
   Grade,
 } = require("../models");
 const registerLogAudit = require("../utils/logAudit");
-const { tenantWhere } = require("../utils/tenantScope");
+const { tenantWhere, studentWhere } = require("../utils/tenantScope");
 const {
   isUniqueConstraintError,
   respondUniqueConstraint,
@@ -82,8 +82,11 @@ function errorTreatment(res, error, standardMessage, req) {
 // Listar todos os estudantes
 async function getAllStudents(req, res) {
   try {
+    // studentWhere = escola + "meus alunos". Para TEACHER devolve só os alunos
+    // das turmas/ofertas que leciona; para os outros papéis é igual ao
+    // tenantWhere de antes.
     const students = await Student.findAll({
-      where: tenantWhere(req),
+      where: studentWhere(req),
       include: [
         { model: User, as: "user", required: false, attributes: ["id", "name", "email", "role", "active"] },
         TURMA_INCLUDE,
@@ -304,7 +307,7 @@ async function getMyAcademicStatus(req, res) {
 async function getStudentById(req, res) {
   try {
     const student = await Student.findOne({
-      where: tenantWhere(req, { id: req.params.id }),
+      where: studentWhere(req, { id: req.params.id }),
       include: [
         { model: User, as: "user", required: false, attributes: ["id", "name", "email", "role", "active"] },
         TURMA_INCLUDE,

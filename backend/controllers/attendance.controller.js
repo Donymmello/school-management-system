@@ -1,6 +1,6 @@
 const { Attendance, Student } = require("../models");
 const registerLogAudit = require("../utils/logAudit");
-const { tenantWhere } = require("../utils/tenantScope");
+const { tenantWhere, studentWhere } = require("../utils/tenantScope");
 const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
 const { resolveOwnStudentId } = require("../utils/selfScope");
 
@@ -10,12 +10,14 @@ const ALLOWED_STATUSES = ["PRESENT", "ABSENT", "LATE", "JUSTIFIED"];
 // o isolamento por escola é feito via join obrigatório no Student dono do
 // registro. `studentScope` também serve pra confirmar que o studentId
 // informado pertence à escola de quem está fazendo a chamada.
+// Ver grade.controller.js: o required: true deste join é o que filtra lista,
+// leitura, alteração e remoção de uma só vez.
 function studentScope(req, extra = {}) {
   return {
     model: Student,
     as: "student",
     required: true,
-    where: tenantWhere(req, extra),
+    where: studentWhere(req, extra),
     attributes: ["id", "name", "studentCode"],
   };
 }
@@ -32,7 +34,7 @@ async function createAttendance(req, res) {
       return res.status(400).json({ message: "Invalid status.", allowedStatuses: ALLOWED_STATUSES });
     }
 
-    const student = await Student.findOne({ where: tenantWhere(req, { id: studentId }), attributes: ["id"] });
+    const student = await Student.findOne({ where: studentWhere(req, { id: studentId }), attributes: ["id"] });
     if (!student) {
       return res.status(404).json({ message: "Student not found in this school." });
     }

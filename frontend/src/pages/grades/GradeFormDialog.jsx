@@ -16,12 +16,20 @@ import { listStudents } from "../../api/students.js";
 import { listTeachers } from "../../api/teachers.js";
 import { listSubjects } from "../../api/subjects.js";
 import { getErrorMessage } from "../../api/errors.js";
+import { useAuth } from "../../context/AuthContext.jsx";
 
 const emptyForm = { studentId: "", teacherId: "", subjectId: "", score: "", term: "" };
 
 // grade === null → modo criação. grade preenchido → modo edição (só nota e
 // período podem ser alterados depois de lançados).
 export default function GradeFormDialog({ open, grade, onClose, onSaved }) {
+  const { user } = useAuth();
+  // O backend força teacherId ao próprio quando quem lança é TEACHER (ver
+  // grade.controller.js createGrade). Mostrar na mesma um seletor de professor
+  // seria oferecer uma escolha que é ignorada em silêncio, por isso o campo
+  // desaparece para esse papel. Secretaria e direção continuam a escolher —
+  // lançam notas em nome do professor que as deu.
+  const isTeacher = user?.role === "TEACHER";
   const isEditing = Boolean(grade);
   const [form, setForm] = useState(emptyForm);
   const [students, setStudents] = useState([]);
@@ -127,6 +135,7 @@ export default function GradeFormDialog({ open, grade, onClose, onSaved }) {
                 ))}
               </TextField>
             </Grid>
+            {!isTeacher && (
             <Grid item xs={12} sm={6}>
               <TextField
                 select
@@ -145,6 +154,7 @@ export default function GradeFormDialog({ open, grade, onClose, onSaved }) {
                 ))}
               </TextField>
             </Grid>
+            )}
             <Grid item xs={12} sm={6}>
               <TextField
                 label="Período"

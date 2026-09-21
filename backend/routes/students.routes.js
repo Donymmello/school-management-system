@@ -5,6 +5,7 @@ const router = express.Router();
 const authMiddleware = require("../middleware/auth.middleware");
 const authorizeRoles = require("../middleware/role.middleware");
 const requireSchool = require("../middleware/tenant.middleware");
+const attachTeacherScope = require("../middleware/teacherScope.middleware");
 
 
 const {
@@ -28,6 +29,7 @@ router.get(
   authMiddleware,
   authorizeRoles(...READ_ROLES),
   requireSchool,
+  attachTeacherScope,
   getAllStudents
 );
 // Precisam vir antes de "/:id" — senão o Express casaria "me"/"me" como :id.
@@ -41,6 +43,7 @@ router.get(
   authMiddleware,
   authorizeRoles(...READ_ROLES),
   requireSchool,
+  attachTeacherScope,
   getStudentById
 );
 router.patch(
@@ -48,6 +51,7 @@ router.patch(
   authMiddleware,
   authorizeRoles(...WRITE_ROLES),
   requireSchool,
+  attachTeacherScope,
   updateStudent
 );
 router.delete(
@@ -55,6 +59,7 @@ router.delete(
   authMiddleware,
   authorizeRoles(...WRITE_ROLES),
   requireSchool,
+  attachTeacherScope,
   deleteStudent
 );
 

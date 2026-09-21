@@ -4,6 +4,7 @@ const router = express.Router();
 const authMiddleware = require("../middleware/auth.middleware");
 const authorizeRoles = require("../middleware/role.middleware");
 const requireSchool = require("../middleware/tenant.middleware");
+const attachTeacherScope = require("../middleware/teacherScope.middleware");
 
 const {
   createGrade,
@@ -22,15 +23,16 @@ const MANAGE_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "TEACHER", "STAFF"];
 // tem esse auto-escopo implementado.
 const READ_ROLES = [...MANAGE_ROLES, "STUDENT"];
 
-router.post("/", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, createGrade);
-router.get("/", authMiddleware, authorizeRoles(...READ_ROLES), requireSchool, getAllGrades);
-router.get("/:id", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, getGradeById);
-router.patch("/:id", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, updateGrade);
+router.post("/", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, attachTeacherScope, createGrade);
+router.get("/", authMiddleware, authorizeRoles(...READ_ROLES), requireSchool, attachTeacherScope, getAllGrades);
+router.get("/:id", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, attachTeacherScope, getGradeById);
+router.patch("/:id", authMiddleware, authorizeRoles(...MANAGE_ROLES), requireSchool, attachTeacherScope, updateGrade);
 router.delete(
   "/:id",
   authMiddleware,
   authorizeRoles("SUPER_ADMIN", "ADMIN", "DIRECTOR"),
   requireSchool,
+  attachTeacherScope,
   deleteGrade
 );
 
