@@ -561,7 +561,11 @@ Ordem sugerida, do que destrava o quê:
    por ora o SUPER_ADMIN muda plano/status manualmente pela tela `/escolas`.
    **Pausado por decisão explícita ("os pagamentos pode esperar") — a
    prioridade agora é o item 5.**
-5. **Portais por papel (Professor, Aluno, Staff) — em andamento, Portal do Aluno e Portal do Staff feitos, landing pública + troca de senha feitas.**
+5. **Portais por papel (Professor, Aluno, Staff) — em andamento. Aluno e Staff
+   feitos; Professor com a primeira fatia feita ("minhas disciplinas") e a
+   segunda por fazer (lançar nota e frequência restrito aos próprios alunos —
+   hoje um professor vê todos os da escola). Landing pública e troca de senha
+   feitas.**
 
    O que existia até aqui (Professores, Disciplinas, Cursos, Ofertas,
    Matrículas, Frequência, Notas — seção 6, item 3) eram todas **telas
