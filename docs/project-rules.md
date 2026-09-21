@@ -138,6 +138,47 @@ só faria sentido pra `HIGHER_ED`) e `GUARDIAN`/encarregado de educação
 (portal pros pais, nos moldes do Portal do Aluno). Nenhum dos dois tem pedido
 concreto ainda; adicionar agora seria especulativo.
 
+**Escopo do professor: só os próprios alunos** (segunda fatia do portal — ver
+seção 6, item 5). Um TEACHER lança e vê notas e frequência apenas dos alunos que
+leciona. "Os meus alunos" calcula-se de duas origens, conforme o
+`academicModel`, mas consultando ambas sem perguntar qual é — numa escola
+`SECONDARY` o professor simplesmente não tem linhas em `CourseOfferingSubject`,
+e vice-versa:
+
+- `SECONDARY` — `TurmaSubject.teacherId` → turma → alunos com esse `turmaId`.
+- `HIGHER_ED` — `CourseOfferingSubject.teacherId` → oferta → matrículas
+  `APPROVED`.
+
+Implementado no mesmo par que `requireSchool`/`tenantWhere`: o middleware
+`attachTeacherScope` resolve uma vez por request e põe `req.teacherStudentIds`;
+o helper síncrono `studentWhere()` (`utils/tenantScope.js`) mescla o filtro. Em
+`grade.controller.js` e `attendance.controller.js` bastou trocar `tenantWhere`
+por `studentWhere` dentro do `studentScope` de cada um: o join com
+`required: true` é o que filtra lista, leitura por id, alteração e remoção, por
+isso um só ponto cobre as quatro operações.
+
+**Distinção que não pode ser perdida em `ownStudentsWhere`:** `undefined` significa
+que quem chama não é TEACHER e não se filtra nada; `[]` significa que é TEACHER e
+não leciona a ninguém, e devolve nenhum aluno. Tratar lista vazia como ausência
+de filtro daria a um professor sem turmas acesso à escola inteira — o oposto do
+pretendido.
+
+**`createGrade` aceitava `teacherId` do corpo do pedido**, o que permitia a um
+professor registar uma nota **como se fosse de outro**. Passa a ser sempre o
+próprio quando quem chama é TEACHER. Os papéis administrativos continuam a
+poder indicá-lo, porque a secretaria lança em nome do professor que deu a aula.
+O seletor de professor desaparece do formulário para o TEACHER: mostrá-lo seria
+oferecer uma escolha que o backend ignora em silêncio.
+
+**Decisão explícita sobre o histórico:** a permissão vem sempre das atribuições
+**atuais**. Deixar de lecionar uma disciplina significa deixar de ver e editar
+as notas dela, **incluindo as que o próprio lançou**. O registo não se perde —
+continua visível para secretaria e direção. A alternativa considerada (manter
+acesso ao que `Grade.teacherId` diz ser seu) foi descartada porque `Attendance`
+**não guarda quem lançou**: teria notas com uma regra e frequência com outra.
+Se algum dia essa assimetria incomodar, o caminho é dar um `teacherId` ao
+`Attendance` primeiro, e só depois reabrir a decisão.
+
 **Ler e escrever são permissões diferentes — bug real encontrado ao lançar nota
 como TEACHER.** `POST /api/grades` e `POST /api/attendance` já aceitavam TEACHER
 e STAFF, que são os papéis que lançam. Mas `GET /api/students` aceitava apenas
