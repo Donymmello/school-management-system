@@ -1,7 +1,10 @@
 import apiClient from "./client.js";
 
-export async function listStudents() {
-  const { data } = await apiClient.get("/students");
+// Sem argumentos devolve tudo, que é o que as telas de listagem querem.
+// Com { search, limit } o backend filtra e trunca — usado pelas caixas de
+// seleção, para não descarregarem a escola inteira à procura de um aluno.
+export async function listStudents(params = {}) {
+  const { data } = await apiClient.get("/students", { params });
   return data;
 }
 

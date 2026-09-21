@@ -82,16 +82,43 @@ function errorTreatment(res, error, standardMessage, req) {
 // Listar todos os estudantes
 async function getAllStudents(req, res) {
   try {
+    // Busca e limite são opcionais e só atuam se vierem na query: quem chama
+    // GET /students sem parâmetros continua a receber tudo, como as telas de
+    // listagem esperam. São as caixas de seleção que os usam, para não
+    // descarregarem a escola inteira à procura de um aluno.
+    const { search, limit } = req.query;
+
+    const where = studentWhere(req);
+
+    if (search && String(search).trim()) {
+      const termo = `%${String(search).trim()}%`;
+      // iLike é do PostgreSQL. No MySQL o LIKE já ignorava maiúsculas por
+      // omissão; aqui é preciso pedi-lo explicitamente.
+      where[Op.or] = [
+        { name: { [Op.iLike]: termo } },
+        { studentCode: { [Op.iLike]: termo } },
+        { email: { [Op.iLike]: termo } },
+      ];
+    }
+
+    const limiteNumero = Number(limit);
+    const limite = Number.isInteger(limiteNumero) && limiteNumero > 0
+      ? Math.min(limiteNumero, 100)
+      : undefined;
+
     // studentWhere = escola + "meus alunos". Para TEACHER devolve só os alunos
     // das turmas/ofertas que leciona; para os outros papéis é igual ao
     // tenantWhere de antes.
     const students = await Student.findAll({
-      where: studentWhere(req),
+      where,
+      ...(limite ? { limit: limite } : {}),
       include: [
         { model: User, as: "user", required: false, attributes: ["id", "name", "email", "role", "active"] },
         TURMA_INCLUDE,
       ],
-      order: [["id", "DESC"]],
+      // Caixa de seleção quer ordem alfabética; a tela de listagem quer os mais
+      // recentes primeiro. Distinguem-se por usarem ou não busca/limite.
+      order: search || limite ? [["name", "ASC"]] : [["id", "DESC"]],
     });
     return res.status(200).json(students);
   } catch (error) {

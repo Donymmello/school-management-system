@@ -586,16 +586,18 @@ Ordem sugerida, do que destrava o quê:
    mesmos papéis que o backend já exige em `authorizeRoles(...)`, pra não
    mostrar um link que vai dar 403. `vite build` validado sem erros.
 
-   **Falta para o MVP completo:** matrícula/nota/frequência ainda dependem de
-   selects simples (aluno, oferta, disciplina) sem busca/paginação — ok pra
-   poucas dezenas de registros, vira problema em escolas grandes. Não há
-   telas de Ofertas→Disciplinas (`CourseOfferingSubject`), Horário
-   (`Schedule`), Avaliações (`Assessment`/`StudentAssessment`) nem Resultado
-   final — ficaram de fora desta fatia por serem mais avançados (modelo
-   faculdade); o backend deles já está pronto e isolado por escola (ver seção
-   5), só falta o frontend se algum cliente precisar. Também não há
-   autoatendimento do aluno (ver a própria matrícula/nota/frequência
-   logado como STUDENT) — hoje só papéis administrativos operam essas telas.
+   **Falta para o MVP completo:** as listas de seleção (aluno, oferta,
+   disciplina) carregam tudo de uma vez e não têm busca. Funciona com dezenas de
+   registos; numa escola com centenas, o formulário de notas passa a descarregar
+   a escola inteira para escolher um aluno. É o que resta deste item.
+
+   ~~Não há telas de Ofertas→Disciplinas, Horário, Avaliações nem Resultado
+   final.~~ **Existem desde a Fase 5** — `pages/courseOfferingSubjects/`,
+   `ScheduleManagerDialog`, `pages/assessments/` (com `ResultadoFinalPanel`).
+
+   ~~Não há autoatendimento do aluno.~~ **Existe desde as Fases 9a-9d** —
+   `/meu-horario`, `/meu-plano-de-estudos`, `/minha-situacao-curricular`, e
+   `/frequencia` e `/notas` em modo só-leitura para STUDENT.
 4. **Billing — em andamento, começou pela parte manual.** O CRUD de `School`
    (criar/listar/editar plano e status) já existia no backend
    (`school.controller.js`) mas não tinha frontend nenhum — agora tem, em

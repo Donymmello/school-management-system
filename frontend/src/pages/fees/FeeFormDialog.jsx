@@ -12,8 +12,8 @@ import {
   TextField,
 } from "@mui/material";
 import { createFee, updateFee } from "../../api/fees.js";
-import { listStudents } from "../../api/students.js";
 import { getErrorMessage } from "../../api/errors.js";
+import StudentPicker from "../../components/StudentPicker.jsx";
 
 const emptyForm = { studentId: "", description: "", amount: "", dueDate: "", notes: "" };
 
@@ -22,7 +22,6 @@ const emptyForm = { studentId: "", description: "", amount: "", dueDate: "", not
 export default function FeeFormDialog({ open, fee, onClose, onSaved }) {
   const isEditing = Boolean(fee);
   const [form, setForm] = useState(emptyForm);
-  const [students, setStudents] = useState([]);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -40,7 +39,6 @@ export default function FeeFormDialog({ open, fee, onClose, onSaved }) {
           }
         : emptyForm
     );
-    listStudents().then(setStudents).catch((err) => setError(getErrorMessage(err, "Não foi possível carregar os alunos.")));
   }, [open, fee]);
 
   function handleChange(field) {
@@ -83,23 +81,15 @@ export default function FeeFormDialog({ open, fee, onClose, onSaved }) {
           )}
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <TextField
-                select
-                label="Aluno"
+              <StudentPicker
                 value={form.studentId}
-                onChange={handleChange("studentId")}
-                fullWidth
+                onChange={(id) => setForm((prev) => ({ ...prev, studentId: id }))}
                 required
                 autoFocus
                 disabled={isEditing}
+                selectedLabel={fee?.student?.name || ""}
                 helperText={isEditing ? "Não pode ser alterado depois de lançado" : undefined}
-              >
-                {students.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>
-                    {s.name} {s.studentCode ? `(${s.studentCode})` : ""}
-                  </MenuItem>
-                ))}
-              </TextField>
+              />
             </Grid>
             <Grid item xs={12}>
               <TextField

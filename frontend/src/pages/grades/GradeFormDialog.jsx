@@ -12,10 +12,10 @@ import {
   TextField,
 } from "@mui/material";
 import { createGrade, updateGrade } from "../../api/grades.js";
-import { listStudents } from "../../api/students.js";
 import { listTeachers } from "../../api/teachers.js";
 import { listSubjects } from "../../api/subjects.js";
 import { getErrorMessage } from "../../api/errors.js";
+import StudentPicker from "../../components/StudentPicker.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 
 const emptyForm = { studentId: "", teacherId: "", subjectId: "", score: "", term: "" };
@@ -32,7 +32,6 @@ export default function GradeFormDialog({ open, grade, onClose, onSaved }) {
   const isTeacher = user?.role === "TEACHER";
   const isEditing = Boolean(grade);
   const [form, setForm] = useState(emptyForm);
-  const [students, setStudents] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [error, setError] = useState(null);
@@ -55,9 +54,9 @@ export default function GradeFormDialog({ open, grade, onClose, onSaved }) {
     // Engolir estes erros dava um formulário com as caixas vazias e nenhuma
     // explicação: um 403 ficava indistinguível de "a escola não tem alunos".
     // Foi assim que um problema de permissões passou por falta de dados.
-    Promise.all([listStudents(), listTeachers(), listSubjects()])
-      .then(([alunos, professores, disciplinas]) => {
-        setStudents(alunos);
+    // Alunos já não entram aqui: o StudentPicker procura-os no servidor.
+    Promise.all([listTeachers(), listSubjects()])
+      .then(([professores, disciplinas]) => {
         setTeachers(professores);
         setSubjects(disciplinas);
       })
@@ -99,23 +98,15 @@ export default function GradeFormDialog({ open, grade, onClose, onSaved }) {
           )}
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <TextField
-                select
-                label="Aluno"
+              <StudentPicker
                 value={form.studentId}
-                onChange={handleChange("studentId")}
-                fullWidth
+                onChange={(id) => setForm((prev) => ({ ...prev, studentId: id }))}
                 required
                 autoFocus
                 disabled={isEditing}
+                selectedLabel={grade?.student?.name || ""}
                 helperText={isEditing ? "Não pode ser alterado depois de lançado" : undefined}
-              >
-                {students.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>
-                    {s.name} {s.studentCode ? `(${s.studentCode})` : ""}
-                  </MenuItem>
-                ))}
-              </TextField>
+              />
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField

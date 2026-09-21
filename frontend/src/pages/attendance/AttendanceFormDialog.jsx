@@ -12,8 +12,8 @@ import {
   TextField,
 } from "@mui/material";
 import { createAttendance, updateAttendance } from "../../api/attendance.js";
-import { listStudents } from "../../api/students.js";
 import { getErrorMessage } from "../../api/errors.js";
+import StudentPicker from "../../components/StudentPicker.jsx";
 
 const STATUS_LABELS = { PRESENT: "Presente", ABSENT: "Ausente", LATE: "Atrasado", JUSTIFIED: "Falta justificada" };
 
@@ -26,7 +26,6 @@ const emptyForm = { studentId: "", date: todayIso(), status: "PRESENT" };
 export default function AttendanceFormDialog({ open, record, onClose, onSaved }) {
   const isEditing = Boolean(record);
   const [form, setForm] = useState(emptyForm);
-  const [students, setStudents] = useState([]);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -38,10 +37,6 @@ export default function AttendanceFormDialog({ open, record, onClose, onSaved })
         ? { studentId: record.studentId, date: record.date, status: record.status }
         : emptyForm
     );
-    // Ver GradeFormDialog: engolir o erro fazia um 403 parecer ausência de alunos.
-    listStudents()
-      .then(setStudents)
-      .catch((err) => setError(getErrorMessage(err, "Não foi possível carregar a lista de alunos.")));
   }, [open, record]);
 
   function handleChange(field) {
@@ -78,23 +73,15 @@ export default function AttendanceFormDialog({ open, record, onClose, onSaved })
           )}
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <TextField
-                select
-                label="Aluno"
+              <StudentPicker
                 value={form.studentId}
-                onChange={handleChange("studentId")}
-                fullWidth
+                onChange={(id) => setForm((prev) => ({ ...prev, studentId: id }))}
                 required
                 autoFocus
                 disabled={isEditing}
+                selectedLabel={record?.student?.name || ""}
                 helperText={isEditing ? "Não pode ser alterado depois de criado" : undefined}
-              >
-                {students.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>
-                    {s.name} {s.studentCode ? `(${s.studentCode})` : ""}
-                  </MenuItem>
-                ))}
-              </TextField>
+              />
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
