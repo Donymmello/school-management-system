@@ -705,9 +705,22 @@ Ordem sugerida, do que destrava o quê:
    um filtro "só as notas que eu lancei" nas telas administrativas atuais —
    acréscimo fácil quando for prioridade.
 
-   **Validado:** `vite build` sem erros e ordem de rotas conferida
-   (`GET /me/subjects` antes de `GET /:id`, senão "me" seria lido como id).
-   Sem Docker neste ambiente, o endpoint não foi exercitado contra dado real.
+   **Validado ponta a ponta contra dado real** (escola `SECONDARY`, turma `8ºA`,
+   professor ligado a Matemática via `TurmaSubject`): a linha aparece na tela do
+   professor autenticado. Pelo caminho confirmou-se também que
+   `GET /api/teachers/me/subjects` responde 401 sem token — ou seja, existe e
+   está protegida — contra `Cannot GET` numa rota inexistente, e que a ordem
+   das rotas está certa (`GET /me/subjects` antes de `GET /:id`, senão "me"
+   seria lido como id). `vite build` sem erros.
+
+   Duas ressalvas honestas sobre esse teste. A atribuição foi inserida
+   diretamente na base por SQL, não pela interface — o
+   `TurmaSubjectFormDialog` continua por exercitar, e só a próxima atribuição
+   feita pela UI dirá se grava bem. E a tela começou por aparecer vazia com o
+   dado já correto na base, o endpoint a responder e o frontend servido pelo
+   Vite já a conter a rota; passou a aparecer sem que nada mudasse do lado do
+   servidor, o que aponta para bundle em cache no browser. Fica como suspeita,
+   não como causa confirmada.
 
    **Portal do Staff — construído.** Decisão explícita: "o staff pode ser o
    pessoal da secretaria responsável por também lançar as notas, tratar das
