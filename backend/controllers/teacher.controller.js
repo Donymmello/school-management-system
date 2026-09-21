@@ -13,6 +13,7 @@ const registerLogAudit = require("../utils/logAudit");
 const { tenantWhere } = require("../utils/tenantScope");
 const { isUniqueConstraintError, respondUniqueConstraint } = require("../utils/dbErrors");
 const { resolveOwnTeacherId } = require("../utils/selfScope");
+const logger = require("../utils/logger");
 
 // Criação de professor passa por POST /api/auth/register-user (role TEACHER),
 // igual ao padrão de Student — cria o User (login) e o Teacher juntos.
@@ -26,7 +27,7 @@ async function getAllTeachers(req, res) {
     });
     return res.status(200).json(teachers);
   } catch (error) {
-    console.error("[Error fetching teachers]:", error);
+    logger.requestError("[Error fetching teachers]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching teachers." });
   }
 }
@@ -41,7 +42,7 @@ async function getTeacherById(req, res) {
     if (!teacher) return res.status(404).json({ message: "Teacher not found." });
     return res.status(200).json(teacher);
   } catch (error) {
-    console.error("[Error fetching teacher]:", error);
+    logger.requestError("[Error fetching teacher]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching the teacher." });
   }
 }
@@ -71,7 +72,7 @@ async function updateTeacher(req, res) {
     return res.status(200).json({ message: "Teacher updated successfully.", teacher });
   } catch (error) {
     if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
-    console.error("[Error updating teacher]:", error);
+    logger.requestError("[Error updating teacher]", req, error);
     return res.status(500).json({ message: "An error occurred while updating the teacher." });
   }
 }
@@ -93,7 +94,7 @@ async function deleteTeacher(req, res) {
 
     return res.status(200).json({ message: "Teacher deleted successfully." });
   } catch (error) {
-    console.error("[Error deleting teacher]:", error);
+    logger.requestError("[Error deleting teacher]", req, error);
     return res.status(500).json({ message: "An error occurred while deleting the teacher." });
   }
 }
@@ -167,7 +168,7 @@ async function getMySubjects(req, res) {
 
     return res.status(200).json({ academicModel: "SECONDARY", items });
   } catch (error) {
-    console.error("[Error fetching teacher subjects]:", error);
+    logger.requestError("[Error fetching teacher subjects]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching your subjects." });
   }
 }
