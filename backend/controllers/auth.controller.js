@@ -12,6 +12,7 @@ const {
   respondValidationError,
 } = require("../utils/dbErrors");
 const sendEmail = require("../utils/email");
+const logger = require("../utils/logger");
 
 const generateToken = (user) => {
   return jwt.sign(
@@ -101,7 +102,7 @@ const bootstrapAdmin = async (req, res) => {
     });
   } catch (error) {
     if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
-    console.error("[Bootstrap Error]:", error);
+    logger.requestError("[Bootstrap Error]", req, error);
     return res.status(500).json({ message: "Error occurred while creating the platform administrator." });
   }
 };
@@ -298,7 +299,7 @@ const registerUser = async (req, res) => {
   } catch (error) {
     if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
     if (isValidationError(error)) return respondValidationError(res, error);
-    console.error("[Error registering user]:", error);
+    logger.requestError("[Error registering user]", req, error);
     return res.status(500).json({ message: "Error occurred while registering user." });
   }
 };
@@ -427,7 +428,7 @@ const registerStudent = async (req, res) => {
     });
   } catch (error) {
     if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
-    console.error("[Error registering student]:", error);
+    logger.requestError("[Error registering student]", req, error);
     return res.status(500).json({
       message: "Error registering student.",
     });
@@ -509,7 +510,7 @@ const login = async (req, res) => {
       user: mapUserToResponse(user),
     });
   } catch (error) {
-    console.error("[Error during login]:", error);
+    logger.requestError("[Error during login]", req, error);
     return res.status(500).json({ message: "Internal error occurred while logging in." });
   }
 };
@@ -540,7 +541,7 @@ const getMe = async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found." });
     return res.status(200).json(user);
   } catch (error) {
-    console.error("[Error fetching profile]:", error);
+    logger.requestError("[Error fetching profile]", req, error);
     return res.status(500).json({ message: "Internal error occurred while fetching profile." });
   }
 };
@@ -584,7 +585,7 @@ const changePassword = async (req, res) => {
 
     return res.status(200).json({ message: "Password changed successfully." });
   } catch (error) {
-    console.error("[Error changing password]:", error);
+    logger.requestError("[Error changing password]", req, error);
     return res.status(500).json({ message: "An error occurred while changing the password." });
   }
 };
@@ -624,13 +625,18 @@ const forgotPassword = async (req, res) => {
       // local sem essas credenciais), não derruba o pedido: cai pro
       // console.log de dev que já existia antes, pra não bloquear teste
       // local sem conta de email de verdade.
-      console.error("[ForgotPassword] Falha ao enviar email, caindo para log de dev:", emailError.message);
+      logger.warn("[ForgotPassword] Falha ao enviar email, caindo para log de dev", {
+        error: emailError.message,
+        userId: req?.user?.id ?? null,
+        endpoint: req.originalUrl,
+        method: req.method,
+      });
       console.log(`[DEV ONLY] Link de Reset: ${resetLink}`);
     }
 
     return res.status(200).json(genericResponse);
   } catch (error) {
-    console.error("[ForgotPassword Error]:", error);
+    logger.requestError("[ForgotPassword Error]", req, error);
     return res.status(500).json({ message: "Erro interno." });
   }
 };
@@ -667,7 +673,7 @@ const resetPassword = async (req, res) => {
 
     return res.status(200).json({ message: "Password redefinida com sucesso." });
   } catch (error) {
-    console.error("[ResetPassword Error]:", error);
+    logger.requestError("[ResetPassword Error]", req, error);
     return res.status(500).json({ message: "Erro interno." });
   }
 };

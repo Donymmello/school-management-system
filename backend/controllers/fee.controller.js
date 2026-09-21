@@ -6,6 +6,7 @@ const { resolveOwnStudentId } = require("../utils/selfScope");
 const { validateAmount, validateCurrency } = require("../utils/validators");
 const { generateReference } = require("../utils/paymentReference");
 const { confirmFeePayment, revertFeePayment } = require("../services/feePayment.service");
+const logger = require("../utils/logger");
 
 // Anexado no include de getAllFees/getFeeById só pra exibir "quem
 // confirmou" — nunca usado como filtro nem exigido (required: false).
@@ -85,7 +86,7 @@ async function createFee(req, res) {
 
     return res.status(201).json({ message: "Fee recorded successfully.", fee });
   } catch (error) {
-    console.error("[Error creating fee]:", error);
+    logger.requestError("[Error creating fee]", req, error);
     return res.status(500).json({ message: "An error occurred while recording the fee." });
   }
 }
@@ -116,7 +117,7 @@ async function getAllFees(req, res) {
 
     return res.status(200).json(fees);
   } catch (error) {
-    console.error("[Error fetching fees]:", error);
+    logger.requestError("[Error fetching fees]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching fees." });
   }
 }
@@ -131,7 +132,7 @@ async function getFeeById(req, res) {
     if (!fee) return res.status(404).json({ message: "Fee not found." });
     return res.status(200).json(fee);
   } catch (error) {
-    console.error("[Error fetching fee]:", error);
+    logger.requestError("[Error fetching fee]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching the fee." });
   }
 }
@@ -162,7 +163,7 @@ async function updateFee(req, res) {
 
     return res.status(200).json({ message: "Fee updated successfully.", fee });
   } catch (error) {
-    console.error("[Error updating fee]:", error);
+    logger.requestError("[Error updating fee]", req, error);
     return res.status(500).json({ message: "An error occurred while updating the fee." });
   }
 }
@@ -205,7 +206,7 @@ async function markFeeStatus(req, res) {
 
     return res.status(200).json({ message: "Fee status updated successfully.", fee });
   } catch (error) {
-    console.error("[Error updating fee status]:", error);
+    logger.requestError("[Error updating fee status]", req, error);
     return res.status(500).json({ message: "An error occurred while updating the fee status." });
   }
 }
@@ -276,7 +277,7 @@ async function getFeeAlerts(req, res) {
       students: Array.from(byStudent.values()),
     });
   } catch (error) {
-    console.error("[Error building fee alerts]:", error);
+    logger.requestError("[Error building fee alerts]", req, error);
     return res.status(500).json({ message: "An error occurred while building fee alerts." });
   }
 }
@@ -292,7 +293,7 @@ async function deleteFee(req, res) {
     await fee.destroy();
     return res.status(200).json({ message: "Fee deleted successfully." });
   } catch (error) {
-    console.error("[Error deleting fee]:", error);
+    logger.requestError("[Error deleting fee]", req, error);
     return res.status(500).json({ message: "An error occurred while deleting the fee." });
   }
 }

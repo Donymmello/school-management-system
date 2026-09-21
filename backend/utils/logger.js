@@ -88,6 +88,25 @@ const logger = {
       writeToFile(log, 'ERROR');
     }
   },
+
+  /**
+   * Erro apanhado num handler de rota. Junta sozinho o que identifica o pedido
+   * (quem, que rota, que método) — sem isto cada call site teria de repetir os
+   * mesmos cinco campos, e na prática nenhum repetia: o que havia era
+   * `console.error(msg, error)`, que morre com o container e não diz de quem
+   * nem de onde veio o pedido.
+   *
+   * `req` é opcional — há helpers partilhados que não o recebem.
+   */
+  requestError(message, req, error) {
+    this.error(message, {
+      error: error?.message ?? (error === undefined ? null : String(error)),
+      stack: error?.stack ?? null,
+      userId: req?.user?.id ?? null,
+      endpoint: req?.originalUrl ?? null,
+      method: req?.method ?? null,
+    });
+  },
 };
 
 module.exports = logger;

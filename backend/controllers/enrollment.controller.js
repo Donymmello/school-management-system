@@ -2,6 +2,7 @@ const { Enrollment, CourseOffering, Student, Course } = require('../models');
 const { tenantWhere } = require('../utils/tenantScope');
 const { isUniqueConstraintError, respondUniqueConstraint } = require('../utils/dbErrors');
 const { resolveOwnStudentId } = require('../utils/selfScope');
+const logger = require("../utils/logger");
 
 // Enrollment não tem schoolId próprio (ver docs/project-rules.md, seção 5) —
 // o isolamento por escola é feito via join obrigatório no Student dono da
@@ -67,7 +68,7 @@ async function enrollStudent(req, res) {
         if (isUniqueConstraintError(error)) {
             return res.status(409).json({ message: "Student is already enrolled in this course offering." });
         }
-        console.error("Error enrolling student:", error);
+        logger.requestError("Error enrolling student", req, error);
 
         return res.status(500).json({
             message: "An error occurred while enrolling the student.",
@@ -102,7 +103,7 @@ async function getEnrollments(req, res) {
 
         return res.status(200).json(enrollments);
     } catch (error) {
-        console.error("Error fetching enrollments:", error);
+        logger.requestError("Error fetching enrollments", req, error);
 
         return res.status(500).json({
             message: "An error occurred while fetching enrollments.",
@@ -137,7 +138,7 @@ async function getEnrollmentById(req, res) {
 
         return res.status(200).json(enrollment);
     } catch (error) {
-        console.error("Error fetching enrollment:", error);
+        logger.requestError("Error fetching enrollment", req, error);
 
         return res.status(500).json({
             message: "An error occurred while fetching the enrollment.",
@@ -178,7 +179,7 @@ async function approveEnrollment(req, res) {
             enrollment,
         });
     } catch (error) {
-        console.error("Error approving enrollment:", error);
+        logger.requestError("Error approving enrollment", req, error);
 
         return res.status(500).json({
             message: "An error occurred while approving the enrollment.",
@@ -220,7 +221,7 @@ async function rejectEnrollment(req, res) {
             enrollment,
         });
     } catch (error) {
-        console.error("Error rejecting enrollment:", error);
+        logger.requestError("Error rejecting enrollment", req, error);
 
         return res.status(500).json({
             message: "An error occurred while rejecting the enrollment.",
@@ -258,7 +259,7 @@ async function cancelEnrollment(req, res) {
             enrollment,
         });
     } catch (error) {
-        console.error("Error cancelling enrollment:", error);
+        logger.requestError("Error cancelling enrollment", req, error);
 
         return res.status(500).json({
             message: "An error occurred while cancelling the enrollment.",

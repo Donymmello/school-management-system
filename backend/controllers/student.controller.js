@@ -22,6 +22,7 @@ const {
   respondValidationError,
 } = require("../utils/dbErrors");
 const { calculateStudentResult } = require("../services/gradeCalculation.service");
+const logger = require("../utils/logger");
 
 const TURMA_INCLUDE = { model: Turma, as: "turma", required: false, attributes: ["id", "name", "grade"] };
 
@@ -55,7 +56,7 @@ async function validateStudentData({ idNumber, userId, studentId = null }) {
 
 const blankToNull = (value) => (value === "" ? null : value);
 
-function errorTreatment(res, error, standardMessage) {
+function errorTreatment(res, error, standardMessage, req) {
   if (isUniqueConstraintError(error)) return respondUniqueConstraint(res, error);
   // Valor recusado por um validate: {...} do model é culpa do pedido, não do
   // servidor — sem isto subia até ao 500 genérico lá em baixo.
@@ -73,7 +74,7 @@ function errorTreatment(res, error, standardMessage) {
     return res.status(knownError.status).json({ message: knownError.message });
   }
 
-  console.error(`[Error]: ${standardMessage}`, error);
+  logger.requestError(standardMessage, req, error);
   return res.status(500).json({ message: standardMessage });
 }
 
@@ -91,7 +92,7 @@ async function getAllStudents(req, res) {
     });
     return res.status(200).json(students);
   } catch (error) {
-    console.error("Error fetching students:", error);
+    logger.requestError("Error fetching students", req, error);
     return res.status(500).json({
       message: "An error occurred while fetching students." });
   }
@@ -113,7 +114,7 @@ async function getMyProfile(req, res) {
     if (!student) return res.status(404).json({ message: "Student profile not found for this user." });
     return res.status(200).json(student);
   } catch (error) {
-    console.error("[Error fetching own student profile]:", error);
+    logger.requestError("[Error fetching own student profile]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching your profile." });
   }
 }
@@ -198,7 +199,7 @@ async function getMyStudyPlan(req, res) {
 
     return res.status(200).json({ academicModel: "SECONDARY", items });
   } catch (error) {
-    console.error("[Error fetching study plan]:", error);
+    logger.requestError("[Error fetching study plan]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching your study plan." });
   }
 }
@@ -294,7 +295,7 @@ async function getMyAcademicStatus(req, res) {
 
     return res.status(200).json({ academicModel: "SECONDARY", items });
   } catch (error) {
-    console.error("[Error building academic status]:", error);
+    logger.requestError("[Error building academic status]", req, error);
     return res.status(500).json({ message: "An error occurred while building your academic status." });
   }
 }
@@ -313,7 +314,7 @@ async function getStudentById(req, res) {
     if (!student) return res.status(404).json({ message: "Student not found." });
     return res.status(200).json(student);
   } catch (error) {
-    console.error("[Error fetching student]:", error);
+    logger.requestError("[Error fetching student]", req, error);
     return res.status(500).json({ message: "An error occurred while fetching the student." });
   }
 }
@@ -380,7 +381,7 @@ async function updateStudent(req, res) {
 
     return res.status(200).json({ message: "Student updated successfully.", student});
   } catch (error) {
-    return errorTreatment(res, error, "An error occurred while updating the student.");
+    return errorTreatment(res, error, "An error occurred while updating the student.", req);
   }
 }
 
@@ -403,7 +404,7 @@ async function deleteStudent(req, res) {
 
     return res.status(200).json({ message: "Student deleted successfully." });
   } catch (error) {
-    console.error("[Error deleting student]:", error);
+    logger.requestError("[Error deleting student]", req, error);
     return res.status(500).json({ message: "An error occurred while deleting the student." });
   }
 }

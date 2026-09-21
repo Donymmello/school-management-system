@@ -5,6 +5,9 @@
 /.pnp
 .pnp.js
 
+# logs estruturados escritos por utils/logger.js quando LOG_TO_FILE=true
+/logs
+
 # testing
 /coverage
 
