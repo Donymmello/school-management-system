@@ -12,7 +12,10 @@ services:
       POSTGRES_PASSWORD: ${DB_PASS}
       POSTGRES_DB: ${DB_NAME}
     ports:
-      - "5432:5432"
+      # 5433 no host porque o projeto kuava publica a 5432. Só afeta
+      # ferramentas do host (psql -p 5433): dentro da rede do compose o backend
+      # liga-se a school:5432, que não passa por porta publicada nenhuma.
+      - "5433:5432"
     volumes:
       - sms_postgres_data:/var/lib/postgresql/data
     # sem isso, "depends_on" só espera o container do postgres existir, não o
@@ -46,10 +49,15 @@ services:
     build: ./frontend
     container_name: sms_frontend
     ports:
-      - "5173:5173"
+      # 5174 no host porque o kuava-web publica a 5173.
+      - "5174:5173"
     environment:
       # dentro da rede do compose o backend não é "localhost", é o nome do serviço
       VITE_API_PROXY_TARGET: http://api_backend:5000
+      # O Vite escuta na 5173 dentro do container, mas o browser chega pela
+      # 5174. Sem dizer ao cliente de HMR qual a porta visível de fora, o
+      # websocket de hot reload tenta a 5173 e falha.
+      VITE_HMR_CLIENT_PORT: 5174
     volumes:
       - ./frontend:/app
       - /app/node_modules
