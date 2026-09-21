@@ -44,9 +44,16 @@ export default function GradeFormDialog({ open, grade, onClose, onSaved }) {
           }
         : emptyForm
     );
-    listStudents().then(setStudents).catch(() => setStudents([]));
-    listTeachers().then(setTeachers).catch(() => setTeachers([]));
-    listSubjects().then(setSubjects).catch(() => setSubjects([]));
+    // Engolir estes erros dava um formulário com as caixas vazias e nenhuma
+    // explicação: um 403 ficava indistinguível de "a escola não tem alunos".
+    // Foi assim que um problema de permissões passou por falta de dados.
+    Promise.all([listStudents(), listTeachers(), listSubjects()])
+      .then(([alunos, professores, disciplinas]) => {
+        setStudents(alunos);
+        setTeachers(professores);
+        setSubjects(disciplinas);
+      })
+      .catch((err) => setError(getErrorMessage(err, "Não foi possível carregar alunos, professores e disciplinas.")));
   }, [open, grade]);
 
   function handleChange(field) {

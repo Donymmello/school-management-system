@@ -38,9 +38,10 @@ export default function AttendanceFormDialog({ open, record, onClose, onSaved })
         ? { studentId: record.studentId, date: record.date, status: record.status }
         : emptyForm
     );
+    // Ver GradeFormDialog: engolir o erro fazia um 403 parecer ausência de alunos.
     listStudents()
       .then(setStudents)
-      .catch(() => setStudents([]));
+      .catch((err) => setError(getErrorMessage(err, "Não foi possível carregar a lista de alunos.")));
   }, [open, record]);
 
   function handleChange(field) {

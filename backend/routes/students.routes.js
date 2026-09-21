@@ -17,10 +17,16 @@ const {
   deleteStudent,
 } = require('../controllers/student.controller');
 
+// TEACHER e STAFF leem, mas não escrevem. Sem isto não conseguiam escolher o
+// aluno ao lançar nota ou frequência — operações que grades.routes.js e
+// attendance.routes.js já lhes permitiam. Alterar e apagar continuam restritos.
+const READ_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "STAFF", "TEACHER"];
+const WRITE_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR"];
+
 router.get(
   '/',
   authMiddleware,
-  authorizeRoles("SUPER_ADMIN", "ADMIN", "DIRECTOR"),
+  authorizeRoles(...READ_ROLES),
   requireSchool,
   getAllStudents
 );
@@ -33,21 +39,21 @@ router.get('/me/academic-status', authMiddleware, authorizeRoles("STUDENT"), get
 router.get(
   '/:id',
   authMiddleware,
-  authorizeRoles("SUPER_ADMIN", "ADMIN", "DIRECTOR"),
+  authorizeRoles(...READ_ROLES),
   requireSchool,
   getStudentById
 );
 router.patch(
   '/:id',
   authMiddleware,
-  authorizeRoles("SUPER_ADMIN", "ADMIN", "DIRECTOR"),
+  authorizeRoles(...WRITE_ROLES),
   requireSchool,
   updateStudent
 );
 router.delete(
   '/:id',
   authMiddleware,
-  authorizeRoles("SUPER_ADMIN", "ADMIN", "DIRECTOR"),
+  authorizeRoles(...WRITE_ROLES),
   requireSchool,
   deleteStudent
 );
