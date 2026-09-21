@@ -6,10 +6,14 @@ const Course = sequelize.define(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
 
+    // Sem `unique` de coluna: o código é gerado de faculty+name
+    // (utils/generateCode.js), por isso duas escolas com um curso do mesmo nome
+    // na mesma faculdade geram o MESMO código. Enquanto foi único global, a
+    // segunda escola ficava impedida de criar o curso. Unicidade por escola em
+    // `indexes`, abaixo.
     code: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      unique: true,
     },
 
     schoolId: {
@@ -76,6 +80,7 @@ const Course = sequelize.define(
   },
   {
     tableName: "courses",
+    indexes: [{ unique: true, name: "course_school_code", fields: ["school_id", "code"] }],
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at",

@@ -6,10 +6,14 @@ const CourseOffering = sequelize.define(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
 
+    // Mesmo raciocínio de models/course.js: o código é gerado do código do curso
+    // + ano + semestre, logo repete-se entre escolas. CourseOffering não tem
+    // schoolId próprio — o isolamento faz-se pelo Course (ver
+    // docs/project-rules.md, seção 5) — por isso a unicidade é por curso, que
+    // já pertence a uma escola.
     code: {
       type: DataTypes.STRING(80),
       allowNull: false,
-      unique: true,
     },
 
     courseId: {
@@ -43,6 +47,7 @@ const CourseOffering = sequelize.define(
   },
   {
     tableName: "course_offerings",
+    indexes: [{ unique: true, name: "offering_course_code", fields: ["course_id", "code"] }],
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at",

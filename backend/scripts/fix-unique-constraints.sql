@@ -43,13 +43,15 @@ BEGIN
       JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
      WHERE i.indisunique
        AND NOT i.indisprimary
-       AND t.relname IN ('subjects', 'classrooms', 'students')
+       AND t.relname IN ('subjects', 'classrooms', 'students', 'courses', 'course_offerings')
      GROUP BY i.indexrelid, t.relname
   LOOP
     IF (r.tbl::text IN ('subjects', 'classrooms')
         AND r.cols IN (ARRAY['school_id'], ARRAY['name'], ARRAY['code']))
        OR (r.tbl::text = 'students'
         AND r.cols IN (ARRAY['id_card'], ARRAY['id_number']))
+       OR (r.tbl::text IN ('courses', 'course_offerings')
+        AND r.cols = ARRAY['code'])
     THEN
       SELECT c.conname INTO con
         FROM pg_constraint c
@@ -85,12 +87,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS classroom_school_name    ON classrooms (school
 CREATE UNIQUE INDEX IF NOT EXISTS classroom_school_code    ON classrooms (school_id, code);
 CREATE UNIQUE INDEX IF NOT EXISTS student_school_id_number ON students   (school_id, id_number);
 
+-- courses.code e course_offerings.code eram únicos GLOBAIS. Como são gerados
+-- (de faculty+name, e de codigo-do-curso+ano+semestre), duas escolas com um
+-- curso do mesmo nome na mesma faculdade geravam o mesmo código e a segunda
+-- ficava impedida de o criar. course_offerings não tem school_id próprio — o
+-- isolamento faz-se pelo curso — por isso a unicidade fica por curso.
+CREATE UNIQUE INDEX IF NOT EXISTS course_school_code       ON courses          (school_id, code);
+CREATE UNIQUE INDEX IF NOT EXISTS offering_course_code     ON course_offerings (course_id, code);
+
 COMMIT;
 
 -- 4. Verificação. Deve mostrar as compostas e nenhuma UNIQUE de coluna única
 --    em school_id, name, code ou id_card.
 SELECT tablename, indexname, indexdef
   FROM pg_indexes
- WHERE tablename IN ('subjects', 'classrooms', 'students')
+ WHERE tablename IN ('subjects', 'classrooms', 'students', 'courses', 'course_offerings')
    AND indexdef LIKE '%UNIQUE%'
  ORDER BY tablename, indexname;

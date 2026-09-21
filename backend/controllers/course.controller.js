@@ -28,7 +28,10 @@ async function createCourse(req, res) {
 
     const code = generateCourseCode({ faculty, name });
 
-    const courseWithCode = await Course.findOne({ where: { code } });
+    // tenantWhere obrigatório: sem ele esta checagem via o curso de OUTRA escola
+    // e devolvia 409 sobre dado alheio — além de bloquear, confirmava a
+    // existência dele.
+    const courseWithCode = await Course.findOne({ where: tenantWhere(req, { code }) });
 
     if (courseWithCode) {
       return res.status(409).json({

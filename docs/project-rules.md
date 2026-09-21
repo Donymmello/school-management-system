@@ -464,11 +464,28 @@ tem `utils/logger.js` (JSON estruturado, `LOG_TO_FILE` a escrever em
 **nenhum controller o usa** — só o `config/databaseSync.js`. Enquanto for
 assim, qualquer erro desaparece no próximo `docker compose up --build`.
 
-**Fica em aberto, decisão de negócio, não mexido:** `Course.code` e
-`CourseOffering.code` têm `unique: true`, ou seja, são únicos globalmente — se a
-escola A usar `ENG101`, a escola B não o pode usar. Pode ser intencional ou ser
-o mesmo descuido. `Fee.reference` também é global e esse parece correto: uma
-referência de pagamento não deve colidir entre escolas.
+**~~Fica em aberto: `Course.code` e `CourseOffering.code` globais.~~ Decidido e
+implementado: únicos por escola.** Era mais grave do que parecia quando foi
+levantado. Os dois códigos são **gerados**, não escritos à mão
+(`utils/generateCode.js`): `generateCourseCode({ faculty, name })` e
+`generateCourseOfferingCode({ courseCode, academicYear, semester })`. Duas
+escolas com um curso do mesmo nome na mesma faculdade geram **o mesmo código**,
+por isso o único global não era uma restrição teórica: **impedia a segunda
+escola de criar o curso**. E o pré-teste em `course.controller.js` fazia
+`Course.findOne({ where: { code } })` sem filtro de escola, devolvendo 409
+sobre um curso alheio — além de bloquear, confirmava que ele existia.
+
+- `courses` — `UNIQUE(school_id, code)`.
+- `course_offerings` — `UNIQUE(course_id, code)`. Não tem `schoolId` próprio: o
+  isolamento faz-se pelo `Course`, seguindo o padrão desta seção, e o curso já
+  pertence a uma escola.
+- O pré-teste passou a usar `tenantWhere`.
+
+**`Fee.reference` continua global de propósito**, e o contraste explica a regra:
+é lido por um gateway de pagamento externo, fora do mundo das escolas, por isso
+não pode colidir na plataforma inteira. Códigos de curso não são lidos por
+ninguém de fora. **Critério: identificador interno de uma escola é único por
+escola; identificador que sai da plataforma é único globalmente.**
 
 **Colunas em camelCase como marcador de associações mortas.** Quatro colunas
 destoavam de um schema todo em snake_case: `subjects."courseId"`,
