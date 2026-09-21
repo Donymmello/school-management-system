@@ -38,10 +38,10 @@ export default function TurmaSubjectFormDialog({ open, turmaId, item, onClose, o
     );
     listSubjects()
       .then(setSubjects)
-      .catch(() => setSubjects([]));
+      .catch((err) => setError(getErrorMessage(err, "Não foi possível carregar as disciplinas.")));
     listTeachers()
       .then(setTeachers)
-      .catch(() => setTeachers([]));
+      .catch((err) => setError(getErrorMessage(err, "Não foi possível carregar os professores.")));
   }, [open, item]);
 
   function handleChange(field) {

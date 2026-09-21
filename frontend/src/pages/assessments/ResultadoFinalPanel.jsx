@@ -18,7 +18,7 @@ export default function ResultadoFinalPanel({ courseOfferingId, courseOfferingSu
   useEffect(() => {
     listEnrollments({ courseOfferingId, status: "APPROVED" })
       .then(setEnrollments)
-      .catch(() => setEnrollments([]));
+      .catch((err) => setError(getErrorMessage(err, "Não foi possível carregar as matrículas.")));
   }, [courseOfferingId]);
 
   async function handleCalculate() {

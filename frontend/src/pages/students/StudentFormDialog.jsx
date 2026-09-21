@@ -69,7 +69,7 @@ export default function StudentFormDialog({ open, student, onClose, onSaved }) {
     if (isSecondary) {
       listTurmas()
         .then(setTurmas)
-        .catch(() => setTurmas([]));
+        .catch((err) => setError(getErrorMessage(err, "Não foi possível carregar as turmas.")));
     }
   }, [open, student, isSecondary]);
 

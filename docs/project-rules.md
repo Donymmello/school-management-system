@@ -138,6 +138,43 @@ só faria sentido pra `HIGHER_ED`) e `GUARDIAN`/encarregado de educação
 (portal pros pais, nos moldes do Portal do Aluno). Nenhum dos dois tem pedido
 concreto ainda; adicionar agora seria especulativo.
 
+**Ler e escrever são permissões diferentes — bug real encontrado ao lançar nota
+como TEACHER.** `POST /api/grades` e `POST /api/attendance` já aceitavam TEACHER
+e STAFF, que são os papéis que lançam. Mas `GET /api/students` aceitava apenas
+`SUPER_ADMIN, ADMIN, DIRECTOR`, e `GET /api/teachers` excluía TEACHER. O
+formulário pedia as listas para preencher as caixas de seleção, levava 403, e
+ficava com elas vazias: **o papel tinha permissão para gravar mas nunca
+conseguia escolher em quem**. Corrigido separando leitura de escrita nas duas
+rotas (`READ_ROLES` inclui STAFF e TEACHER; `WRITE_ROLES` mantém os três papéis
+administrativos). O isolamento por escola não muda — `requireSchool` e
+`tenantWhere` continuam a limitar tudo à escola de quem pede.
+
+Ao abrir uma operação a um papel novo, verificar também os endpoints que a tela
+dessa operação **lê** para se montar, não só o endpoint que ela escreve.
+
+**Por que demorou a aparecer: `.catch(() => setX([]))`.** Os formulários
+engoliam o erro de carregamento e deixavam a lista vazia, o que tornava um 403
+indistinguível de "a escola não tem alunos". Um problema de permissões passou
+por falta de dados. Os 12 casos do frontend passaram a mostrar o erro; o único
+que ficou a engolir é o `getMyProfile()` do `DashboardHome`, de propósito — é
+um enriquecimento opcional do painel do aluno e falhar ali não deve encher o
+ecrã de erro. **Regra: carregamento que preenche uma caixa de seleção mostra o
+erro; só enriquecimento opcional é que pode falhar em silêncio.**
+
+**Auditoria papel-contra-endpoint — feita, sem outros casos.** Para cada rota do
+frontend, os papéis que a podem abrir foram comparados com os papéis aceites em
+todos os endpoints que a página chama (15 rotas, 78 endpoints, 92 funções de
+api). Os casos sinalizados são todos falsos positivos: páginas onde STUDENT
+entra em modo só-leitura e o botão nunca aparece, e `/salas` e `/disciplinas`,
+onde a constante `MANAGE_ROLES` da própria página já coincide com o backend.
+
+Fica porém identificada a fraqueza estrutural: **cada página duplica à mão as
+constantes de papéis do backend** (`MANAGE_ROLES`, `READ_ONLY_ROLES`,
+`DELETE_ROLES`), e nada obriga as duas a concordar. O bug de hoje passou
+precisamente por aí — o `listStudents()` não tinha constante nenhuma a
+protegê-lo, assumia-se disponível. Enquanto essa duplicação existir, a auditoria
+vale a pena ser repetida sempre que se mexer em papéis.
+
 Regra geral: toda ação de um usuário não-SUPER_ADMIN é implicitamente restrita ao
 próprio `schoolId`.
 

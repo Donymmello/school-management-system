@@ -40,7 +40,7 @@ export default function TurmaFormDialog({ open, turma, onClose, onSaved }) {
     );
     listClassrooms()
       .then(setClassrooms)
-      .catch(() => setClassrooms([]));
+      .catch((err) => setError(getErrorMessage(err, "Não foi possível carregar as salas.")));
   }, [open, turma]);
 
   function handleChange(field) {

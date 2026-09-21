@@ -40,7 +40,7 @@ export default function TeacherFormDialog({ open, teacher, onClose, onSaved }) {
     );
     listSubjects()
       .then(setSubjects)
-      .catch(() => setSubjects([]));
+      .catch((err) => setError(getErrorMessage(err, "Não foi possível carregar as disciplinas.")));
   }, [open, teacher]);
 
   function handleChange(field) {

@@ -31,10 +31,10 @@ export default function EnrollmentFormDialog({ open, onClose, onSaved }) {
     setForm(emptyForm);
     listStudents()
       .then(setStudents)
-      .catch(() => setStudents([]));
+      .catch((err) => setError(getErrorMessage(err, "Não foi possível carregar os alunos.")));
     listCourseOfferings()
       .then((all) => setOfferings(all.filter((o) => o.active !== false)))
-      .catch(() => setOfferings([]));
+      .catch((err) => setError(getErrorMessage(err, "Não foi possível carregar as ofertas.")));
   }, [open]);
 
   function handleChange(field) {

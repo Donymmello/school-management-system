@@ -41,7 +41,7 @@ export default function CourseOfferingFormDialog({ open, offering, onClose, onSa
     );
     listCourses()
       .then(setCourses)
-      .catch(() => setCourses([]));
+      .catch((err) => setError(getErrorMessage(err, "Não foi possível carregar os cursos.")));
   }, [open, offering]);
 
   function handleChange(field) {

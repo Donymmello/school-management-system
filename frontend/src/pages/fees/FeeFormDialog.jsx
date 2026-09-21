@@ -40,7 +40,7 @@ export default function FeeFormDialog({ open, fee, onClose, onSaved }) {
           }
         : emptyForm
     );
-    listStudents().then(setStudents).catch(() => setStudents([]));
+    listStudents().then(setStudents).catch((err) => setError(getErrorMessage(err, "Não foi possível carregar os alunos.")));
   }, [open, fee]);
 
   function handleChange(field) {
