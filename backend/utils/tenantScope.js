@@ -18,6 +18,19 @@ function tenantWhere(req, where = {}) {
 */
 function ownStudentsWhere(req, where = {}) {
   if (!Array.isArray(req.teacherStudentIds)) return where;
+
+  // Se o where já pede um id concreto, CRUZAR com a lista em vez de a
+  // sobrepor. A primeira versão fazia `{ ...where, id: teacherStudentIds }`,
+  // o que substituía o id pedido: `validateRelations` perguntava pelo aluno 2,
+  // ficava a perguntar pelos alunos [1], encontrava o aluno 1, dava a
+  // validação por boa — e a nota era gravada para o aluno 2. Apanhado por
+  // teste de fumo (backend/scripts/smoke-teacher-scope.js).
+  if (where.id !== undefined) {
+    const pedidos = Array.isArray(where.id) ? where.id : [where.id];
+    const permitidos = pedidos.filter((id) => req.teacherStudentIds.includes(Number(id)));
+    return { ...where, id: permitidos };
+  }
+
   return { ...where, id: req.teacherStudentIds };
 }
 
