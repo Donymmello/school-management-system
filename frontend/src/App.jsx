@@ -28,6 +28,7 @@ import MySchedulePage from "./pages/schedule/MySchedulePage.jsx";
 import StudyPlanPage from "./pages/studyPlan/StudyPlanPage.jsx";
 import MySubjectsPage from "./pages/teacherPortal/MySubjectsPage.jsx";
 import StudentReportCardPage from "./pages/students/StudentReportCardPage.jsx";
+import FeeReceiptPage from "./pages/fees/FeeReceiptPage.jsx";
 import AcademicStatusPage from "./pages/studyPlan/AcademicStatusPage.jsx";
 import FeesListPage from "./pages/fees/FeesListPage.jsx";
 import FeeAlertsPage from "./pages/fees/FeeAlertsPage.jsx";
@@ -66,6 +67,10 @@ const GRADES_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "TEACHER", "STAFF", "S
 // STAFF lança e gerencia; STUDENT só lê as próprias (portal do aluno,
 // auto-escopado no backend) — ver docs/project-rules.md, seção 6, item 5.
 const FEES_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "STAFF", "STUDENT"];
+// Sem STUDENT: GET /fees/:id só aceita os papéis administrativos, por isso o
+// aluno levaria 403 a abrir o próprio recibo. Deixá-lo imprimi-lo exige abrir
+// esse endpoint com verificação de dono — decisão separada, não feita aqui.
+const FEE_RECEIPT_ROLES = ["SUPER_ADMIN", "ADMIN", "DIRECTOR", "STAFF"];
 const SCHOOLS_ROLES = ["SUPER_ADMIN"];
 // Fase 8 — self-service da própria escola, só ADMIN (ver
 // backend/controllers/school.controller.js updateSchool: SUPER_ADMIN já
@@ -239,6 +244,14 @@ export default function App() {
             element={
               <RequireAuth allowedRoles={GRADES_ROLES}>
                 <GradesListPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/propinas/:id/recibo"
+            element={
+              <RequireAuth allowedRoles={FEE_RECEIPT_ROLES}>
+                <FeeReceiptPage />
               </RequireAuth>
             }
           />

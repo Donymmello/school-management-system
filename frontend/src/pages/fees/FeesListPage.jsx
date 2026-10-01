@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -22,6 +23,7 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import UndoIcon from "@mui/icons-material/Undo";
+import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { deleteFee, listFees, markFeeStatus } from "../../api/fees.js";
@@ -90,6 +92,7 @@ function PaymentReferenceCell({ fee, onCopy }) {
 }
 
 export default function FeesListPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const canDelete = DELETE_ROLES.includes(user?.role);
   // Portal do aluno: STUDENT só lê as próprias propinas (auto-escopado no
@@ -266,6 +269,17 @@ export default function FeesListPage() {
                         ) : (
                           <CheckCircleOutlineIcon fontSize="small" />
                         )}
+                      </IconButton>
+                      <IconButton
+                        aria-label={
+                          fee.status === "PAID"
+                            ? `Recibo: ${fee.description}`
+                            : `Aviso de pagamento: ${fee.description}`
+                        }
+                        onClick={() => navigate(`/propinas/${fee.id}/recibo`)}
+                        size="small"
+                      >
+                        <PrintOutlinedIcon fontSize="small" />
                       </IconButton>
                       <IconButton
                         aria-label={`Editar propina: ${fee.description}`}

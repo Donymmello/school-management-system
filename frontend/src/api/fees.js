@@ -5,6 +5,11 @@ export async function listFees(params) {
   return data;
 }
 
+export async function getFeeById(id) {
+  const { data } = await apiClient.get(`/fees/${id}`);
+  return data;
+}
+
 export async function createFee(payload) {
   const { data } = await apiClient.post("/fees", payload);
   return data;
