@@ -11,3 +11,49 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/*
+  Impressão. O browser já tem motor de PDF: uma vista com estas regras e
+  Ctrl+P → "Guardar como PDF" dispensa qualquer biblioteca de geração de PDF
+  no servidor (ver docs/project-rules.md, seção 6, item 7).
+
+  As telas de impressão vivem dentro do DashboardLayout, por isso a barra de
+  topo e o menu lateral têm de sair daqui. `.no-print` serve para os botões da
+  própria tela (imprimir, voltar) e qualquer coisa que não deva ir ao papel.
+*/
+@media print {
+  .MuiAppBar-root,
+  .MuiDrawer-root,
+  .no-print {
+    display: none !important;
+  }
+
+  /* O conteúdo é deslocado para dar espaço ao menu; no papel não há menu. */
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  body {
+    background: #fff !important;
+  }
+
+  /* Tinta: fundos e sombras do tema não servem em papel. */
+  .MuiPaper-root {
+    box-shadow: none !important;
+    border: 1px solid #ccc;
+  }
+
+  /* Não cortar uma linha da tabela ao meio entre páginas. */
+  tr,
+  .evitar-corte {
+    break-inside: avoid;
+  }
+
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+}

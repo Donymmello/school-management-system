@@ -27,6 +27,7 @@ import GradesListPage from "./pages/grades/GradesListPage.jsx";
 import MySchedulePage from "./pages/schedule/MySchedulePage.jsx";
 import StudyPlanPage from "./pages/studyPlan/StudyPlanPage.jsx";
 import MySubjectsPage from "./pages/teacherPortal/MySubjectsPage.jsx";
+import StudentReportCardPage from "./pages/students/StudentReportCardPage.jsx";
 import AcademicStatusPage from "./pages/studyPlan/AcademicStatusPage.jsx";
 import FeesListPage from "./pages/fees/FeesListPage.jsx";
 import FeeAlertsPage from "./pages/fees/FeeAlertsPage.jsx";
@@ -89,6 +90,14 @@ export default function App() {
           }
         >
           <Route path="/painel" element={<DashboardHome />} />
+          <Route
+            path="/alunos/:id/boletim"
+            element={
+              <RequireAuth allowedRoles={STUDENTS_ROLES}>
+                <StudentReportCardPage />
+              </RequireAuth>
+            }
+          />
           <Route
             path="/alunos"
             element={

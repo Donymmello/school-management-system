@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -18,6 +19,7 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import { deleteStudent, listStudents } from "../../api/students.js";
 import { getErrorMessage } from "../../api/errors.js";
@@ -25,6 +27,7 @@ import ConfirmDialog from "../../components/ConfirmDialog.jsx";
 import StudentFormDialog from "./StudentFormDialog.jsx";
 
 export default function StudentsListPage() {
+  const navigate = useNavigate();
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -152,6 +155,13 @@ export default function StudentsListPage() {
                     />
                   </TableCell>
                   <TableCell align="right">
+                    <IconButton
+                      aria-label={`Boletim de ${student.name}`}
+                      onClick={() => navigate(`/alunos/${student.id}/boletim`)}
+                      size="small"
+                    >
+                      <PrintOutlinedIcon fontSize="small" />
+                    </IconButton>
                     <IconButton
                       aria-label={`Editar ${student.name}`}
                       onClick={() => openEdit(student)}

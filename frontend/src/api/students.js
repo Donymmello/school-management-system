@@ -32,6 +32,11 @@ export async function getMyAcademicStatus() {
 // Não existe POST /api/students no backend: criar aluno cria um User (login)
 // junto, então passa pelo mesmo endpoint de registro usado pro admin cadastrar
 // qualquer papel (backend/controllers/auth.controller.js registerUser).
+export async function getStudentById(id) {
+  const { data } = await apiClient.get(`/students/${id}`);
+  return data;
+}
+
 export async function createStudent(payload) {
   const { data } = await apiClient.post("/auth/register-user", {
     ...payload,
